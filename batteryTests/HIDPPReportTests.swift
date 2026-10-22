@@ -82,14 +82,17 @@ struct HIDPPReportTests {
 
 @Suite("HID++ 1.0 device connection notifications")
 struct HIDPPConnectionNotificationTests {
-    @Test func parsesLinkEstablished() {
-        let report: [UInt8] = [0x10, 0x02, 0x41, 0x04, 0x01, 0x6B, 0x40]
+    // Byte 3 is the protocol type (0x04 Unifying, 0x10 Bolt); byte 4 carries the device info flags.
+    @Test(arguments: [0x04, 0x10] as [UInt8])
+    func parsesLinkEstablished(protocolType: UInt8) {
+        let report: [UInt8] = [0x10, 0x02, 0x41, protocolType, 0x02, 0x6B, 0x40]
         #expect(HIDPPConnectionNotification(report: report)
                 == HIDPPConnectionNotification(deviceIndex: 2, isLinkEstablished: true))
     }
 
-    @Test func parsesLinkNotEstablished() {
-        let report: [UInt8] = [0x10, 0x01, 0x41, 0x44, 0x01, 0x6B, 0x40]
+    @Test(arguments: [0x04, 0x10] as [UInt8])
+    func parsesLinkNotEstablished(protocolType: UInt8) {
+        let report: [UInt8] = [0x10, 0x01, 0x41, protocolType, 0x41, 0x6B, 0x40]
         #expect(HIDPPConnectionNotification(report: report)
                 == HIDPPConnectionNotification(deviceIndex: 1, isLinkEstablished: false))
     }
@@ -100,6 +103,7 @@ struct HIDPPConnectionNotificationTests {
         [0x10, 0xFF, 0x41, 0x04, 0x01, 0x6B, 0x40], // receiver index, not a paired slot
         [0x10, 0x07, 0x41, 0x04, 0x01, 0x6B, 0x40], // outside the paired slots 1...6
         [0x10, 0x02, 0x41], // truncated
+        [0x10, 0x02, 0x41, 0x04], // truncated before the flags byte
         [0x10, 0x02, 0x8F, 0x41, 0x0B, 0x09, 0x00], // HID++ 1.0 error report
     ] as [[UInt8]])
     func ignoresOtherReports(report: [UInt8]) {

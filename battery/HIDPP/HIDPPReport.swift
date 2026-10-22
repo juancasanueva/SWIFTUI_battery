@@ -84,7 +84,7 @@ nonisolated enum HIDPPMatch: Sendable, Equatable {
 }
 
 /// HID++ 1.0 "device connection" notification the receiver sends when a paired slot's link changes,
-/// including when a different device is paired into the slot: `[0x10, deviceIndex, 0x41, flags, ...]`.
+/// including when a different device is paired into the slot: `[0x10, deviceIndex, 0x41, protocolType, flags, ...]`.
 nonisolated struct HIDPPConnectionNotification: Sendable, Equatable {
     static let subID: UInt8 = 0x41
     /// Set in `flags` when the link is NOT established (device asleep, off, or out of range).
@@ -100,9 +100,10 @@ nonisolated struct HIDPPConnectionNotification: Sendable, Equatable {
 
     /// Nil for every other report.
     init?(report: [UInt8]) {
-        guard report.count >= 4, report[0] == HIDPP.shortReportID, report[2] == Self.subID,
+        // Byte 3 is the protocol type (0x04 Unifying, 0x10 Bolt); byte 4 holds the device info flags.
+        guard report.count >= 5, report[0] == HIDPP.shortReportID, report[2] == Self.subID,
               HIDPP.pairedDeviceIndices.contains(report[1])
         else { return nil }
-        self.init(deviceIndex: report[1], isLinkEstablished: report[3] & Self.linkNotEstablishedFlag == 0)
+        self.init(deviceIndex: report[1], isLinkEstablished: report[4] & Self.linkNotEstablishedFlag == 0)
     }
 }
