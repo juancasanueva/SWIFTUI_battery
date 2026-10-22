@@ -7,10 +7,12 @@ nonisolated struct Receiver: Sendable, Hashable, Identifiable {
     let productID: Int
     let name: String
 
-    /// Receiver product IDs, as listed by Solaar (`lib/logitech_receiver/base_usb.py`). Their devices
-    /// answer on slots 1...6, so they skip the 0xFF probe that tells wired devices apart.
+    /// Receiver product IDs, as listed by Solaar (`lib/logitech_receiver/base_usb.py`), plus 0xC543,
+    /// the PRO 2 LIGHTSPEED dongle (reported by a user; listed as a LIGHTSPEED Receiver in driver
+    /// databases). Their devices answer on slots 1...6, so they skip the 0xFF probe that tells wired
+    /// devices apart.
     private static let unifyingProductIDs: Set<Int> = [0xC52B, 0xC532]
-    private static let lightspeedProductIDs: Set<Int> = [0xC539, 0xC53A, 0xC53D, 0xC53F, 0xC541, 0xC545, 0xC547, 0xC54D]
+    private static let lightspeedProductIDs: Set<Int> = [0xC539, 0xC53A, 0xC53D, 0xC53F, 0xC541, 0xC543, 0xC545, 0xC547, 0xC54D]
     private static let knownReceiverProductIDs: Set<Int> = unifyingProductIDs
         .union(lightspeedProductIDs)
         .union([0xC548]) // Bolt

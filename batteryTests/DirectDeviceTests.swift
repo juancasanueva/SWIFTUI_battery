@@ -117,3 +117,21 @@ struct ReceiverFallbackTests {
         #expect(InterfaceClassification.resolvedKind(silent, unansweredChecks: InterfaceClassification.maxUnansweredChecks) == .receiver)
     }
 }
+
+@Suite("HID++ interface matching")
+struct HIDPPMatchingTests {
+    /// The PRO 2 LIGHTSPEED (0xC09A) exposes HID++ on 0xFF43 over its cable; receivers and the
+    /// PRO X SUPERLIGHT 2 SE use 0xFF00.
+    @Test func matchesBothLogitechHIDPPVendorPages() {
+        #expect(HIDPPMatching.usagePages == [0xFF00, 0xFF43])
+        #expect(HIDPPMatching.criteria == [
+            ["VendorID": 0x046D, "PrimaryUsagePage": 0xFF00],
+            ["VendorID": 0x046D, "PrimaryUsagePage": 0xFF43],
+        ])
+    }
+
+    @Test func thePRO2LightspeedDongleIsAKnownLightspeedReceiver() {
+        #expect(Receiver.isKnownReceiver(productID: 0xC543))
+        #expect(Receiver.displayName(productID: 0xC543, productString: "USB Receiver") == "Lightspeed Receiver")
+    }
+}

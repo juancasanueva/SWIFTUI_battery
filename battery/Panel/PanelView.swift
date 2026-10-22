@@ -238,7 +238,7 @@ struct EmptyDevicesCard: View {
                 .font(.system(size: 22))
                 .foregroundStyle(Theme.dim)
                 .accessibilityHidden(true)
-            Text(hasReceivers ? "No devices found" : "No Logitech receiver connected")
+            Text(hasReceivers ? "No devices found" : "No Logitech device connected")
                 .font(Theme.font(.body))
                 .foregroundStyle(Theme.dim)
                 .multilineTextAlignment(.center)

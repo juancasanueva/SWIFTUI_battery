@@ -3,11 +3,21 @@ import IOKit
 import IOKit.hid
 import os
 
-/// Thin IOKit glue: one HID++ channel per Logitech receiver vendor interface (usage page 0xFF00).
+/// Which HID interfaces carry HID++: Logitech's vendor pages 0xFF00 (receivers and most devices)
+/// and 0xFF43 (newer G devices such as the PRO 2 LIGHTSPEED over its cable).
+nonisolated enum HIDPPMatching {
+    static let logitechVendorID = 0x046D
+    static let usagePages = [0xFF00, 0xFF43]
+
+    /// One IOHIDManager matching dictionary per vendor page.
+    static var criteria: [[String: Int]] {
+        usagePages.map { [kIOHIDVendorIDKey: logitechVendorID, kIOHIDPrimaryUsagePageKey: $0] }
+    }
+}
+
+/// Thin IOKit glue: one HID++ channel per Logitech HID++ vendor interface (see `HIDPPMatching`).
 /// Everything runs on the main run loop / main actor; one request is in flight per receiver.
 final class HIDPPTransport {
-    static let logitechVendorID = 0x046D
-    static let vendorUsagePage = 0xFF00
     static let requestTimeout: Duration = .seconds(1)
     private static let reportBufferSize = 64
 
@@ -33,11 +43,7 @@ final class HIDPPTransport {
         guard !isStarted else { return kIOReturnSuccess }
         isStarted = true
 
-        let matching: [String: Any] = [
-            kIOHIDVendorIDKey: Self.logitechVendorID,
-            kIOHIDPrimaryUsagePageKey: Self.vendorUsagePage,
-        ]
-        IOHIDManagerSetDeviceMatching(manager, matching as CFDictionary)
+        IOHIDManagerSetDeviceMatchingMultiple(manager, HIDPPMatching.criteria as CFArray)
         let context = Unmanaged.passUnretained(self).toOpaque()
         IOHIDManagerRegisterDeviceMatchingCallback(manager, { context, _, _, device in
             guard let context else { return }
