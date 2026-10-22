@@ -10,17 +10,37 @@ struct BatteryMenuBarLabel: View {
         Group {
             if segments.isEmpty {
                 Image(systemName: MenuBarLabel.emptySymbol)
+            } else if let image = Self.renderedImage(for: segments) {
+                Image(nsImage: image)
             } else {
-                // A single Text with inline images renders reliably inside the status item.
-                segments.enumerated().reduce(Text("")) { text, element in
-                    let (offset, segment) = element
-                    let separator = offset == 0 ? Text("") : Text("  ")
-                    let charging = segment.isCharging ? Text(Image(systemName: MenuBarLabel.chargingSymbol)) : Text("")
-                    return text + separator + Text(Image(systemName: segment.symbol)) + Text(" \(segment.text)") + charging
-                }
+                Text(segments.map(\.text).joined(separator: "  "))
             }
         }
         .accessibilityLabel(MenuBarLabel.accessibilityText(for: segments))
+    }
+
+    /// The status item drops images embedded in a label `Text`, so the symbols and percentages
+    /// are drawn into one template image that follows the menu bar's appearance.
+    private static func renderedImage(for segments: [MenuBarLabel.Segment]) -> NSImage? {
+        let content = HStack(spacing: 8) {
+            ForEach(Array(segments.enumerated()), id: \.offset) { _, segment in
+                HStack(spacing: 3) {
+                    Image(systemName: segment.symbol)
+                    Text(segment.text)
+                    if segment.isCharging {
+                        Image(systemName: MenuBarLabel.chargingSymbol)
+                    }
+                }
+            }
+        }
+        .font(.system(size: 13))
+        .foregroundStyle(.black)
+
+        let renderer = ImageRenderer(content: content)
+        renderer.scale = NSScreen.main?.backingScaleFactor ?? 2
+        guard let image = renderer.nsImage else { return nil }
+        image.isTemplate = true
+        return image
     }
 }
 
