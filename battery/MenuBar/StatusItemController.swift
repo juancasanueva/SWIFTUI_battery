@@ -1,9 +1,9 @@
 import AppKit
 import SwiftUI
 
-/// Owns the `NSStatusItem` and the popover with the panel. The button shows the keyboard and mouse
-/// batteries and is redrawn whenever the device list changes; a click toggles the popover, whose
-/// arrow points at the button.
+/// Owns the `NSStatusItem` and the popover with the panel. The button hosts the keyboard and mouse
+/// batteries as a SwiftUI view, updated whenever the device list changes; a click toggles the
+/// popover, whose arrow points at the button.
 ///
 /// It is an `NSObject` subclass because AppKit needs one: the button uses target-action and the
 /// popover reports its transitions through `NSPopoverDelegate`.
@@ -15,6 +15,10 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     private let presentation = PanelPresentation()
     private let statusItem: NSStatusItem
     private let popover = NSPopover()
+    /// Draws the segments inside the button; transparent to clicks so the button still gets them.
+    private let hostingView = PassthroughHostingView(rootView: StatusItemContent(segments: []))
+    /// Segments currently shown; `nil` before the first draw.
+    private var shownSegments: [MenuBarLabel.Segment]?
 
     init(service: DeviceService, launchAtLogin: LaunchAtLogin, updater: (any AppUpdating)?) {
         self.service = service
@@ -32,8 +36,16 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
 
     private func configureButton() {
         guard let button = statusItem.button else { return }
-        button.imagePosition = .imageLeading
-        button.font = .monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+        // Device updates must not rewrite Auto Layout constraints; the width is set explicitly.
+        hostingView.sizingOptions = []
+        hostingView.translatesAutoresizingMaskIntoConstraints = false
+        button.addSubview(hostingView)
+        NSLayoutConstraint.activate([
+            hostingView.leadingAnchor.constraint(equalTo: button.leadingAnchor),
+            hostingView.trailingAnchor.constraint(equalTo: button.trailingAnchor),
+            hostingView.topAnchor.constraint(equalTo: button.topAnchor),
+            hostingView.bottomAnchor.constraint(equalTo: button.bottomAnchor),
+        ])
         button.target = self
         button.action = #selector(togglePopover)
     }
@@ -67,20 +79,18 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         draw(devices)
     }
 
+    /// Updates the hosted view and the item's width only when the segments change, so unchanged
+    /// readings neither redraw nor resize the item.
     private func draw(_ devices: [LogitechDevice]) {
         guard let button = statusItem.button else { return }
         let segments = MenuBarLabel.segments(for: devices)
-        if segments.isEmpty {
-            button.image = StatusItemImage.emptyImage()
-            button.title = ""
-        } else if let image = StatusItemImage.image(for: segments) {
-            button.image = image
-            button.title = ""
-        } else {
-            button.image = nil
-            button.title = MenuBarLabel.fallbackText(for: segments)
-        }
-        button.setAccessibilityLabel(MenuBarLabel.accessibilityText(for: segments))
+        guard segments != shownSegments else { return }
+        shownSegments = segments
+        hostingView.rootView = StatusItemContent(segments: segments)
+        statusItem.length = StatusItemContent.fittingWidth(for: segments)
+        let description = MenuBarLabel.accessibilityText(for: segments)
+        button.setAccessibilityLabel(description)
+        button.toolTip = description
     }
 
     // MARK: - Popover
