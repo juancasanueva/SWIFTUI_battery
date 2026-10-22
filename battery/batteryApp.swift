@@ -5,28 +5,20 @@
 //  Created by Juan Casanueva on 22/10/2026.
 //
 
+import AppKit
 import SwiftUI
-import SwiftData
 
 @main
 struct batteryApp: App {
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Item.self,
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
-        }
-    }()
-
     var body: some Scene {
-        WindowGroup {
-            ContentView()
+        MenuBarExtra {
+            Button("Quit") {
+                NSApplication.shared.terminate(nil)
+            }
+            .keyboardShortcut("q")
+        } label: {
+            Label("—", systemImage: "battery.100")
+                .labelStyle(.titleAndIcon)
         }
-        .modelContainer(sharedModelContainer)
     }
 }
