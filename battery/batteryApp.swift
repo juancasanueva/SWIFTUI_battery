@@ -7,24 +7,16 @@
 
 import SwiftUI
 
+/// Battery lives only in the menu bar (`LSUIElement = YES`). `AppDelegate` owns the device service,
+/// the status item and the popover with the panel.
 @main
 struct batteryApp: App {
-    @State private var deviceService: DeviceService
-
-    init() {
-        let service = DeviceService()
-        // The unit tests use this app as their host; keep them off the real receivers.
-        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil {
-            service.start()
-        }
-        _deviceService = State(initialValue: service)
-    }
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
-        MenuBarExtra {
-            BatteryMenuContent(service: deviceService)
-        } label: {
-            BatteryMenuBarLabel(devices: deviceService.devices)
+        // An empty Settings scene is the only scene, so no window opens at launch.
+        Settings {
+            EmptyView()
         }
     }
 }
