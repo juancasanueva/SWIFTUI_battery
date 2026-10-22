@@ -1,6 +1,6 @@
 name: Release
 
-# The only publishing path for Battery. A pushed version tag is the
+# The only publishing path for PeriBattery. A pushed version tag is the
 # single trigger: this job holds a Developer ID certificate and an App Store
 # Connect key, so any trigger reachable by a contributor would hand both to
 # whoever reached it. `scripts/release.sh` carries the build sequence and runs
@@ -171,7 +171,7 @@ jobs:
         run: scripts/release.sh smoke
 
       - name: Record signing evidence
-        run: codesign -dvvv --entitlements :- "build/export/battery.app" 2>&1
+        run: codesign -dvvv --entitlements :- "build/export/PeriBattery.app" 2>&1
 
       # The pinned Sparkle tools are downloaded and digest-checked here,
       # **before** the release exists, for the same reason the feed is fetched
@@ -210,7 +210,7 @@ jobs:
           # Nothing here deletes, unpublishes, or re-flags a previous release:
           # withdrawing one stays a deliberate maintainer action.
           # shellcheck disable=SC2086            # $PRERELEASE is a bare flag or empty
-          gh release create "$GITHUB_REF_NAME" "build/Battery-${VERSION}.zip" \
+          gh release create "$GITHUB_REF_NAME" "build/PeriBattery-${VERSION}.zip" \
             --verify-tag --generate-notes --title "$GITHUB_REF_NAME" $PRERELEASE
 
       # Appcast publication. Every step below, like the two fetches above, carries
@@ -229,8 +229,8 @@ jobs:
           # tool's standard input. It is never interpolated into a `run:` line,
           # which the runner would echo into the step header before masking it.
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
-          ASSET_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/${{ github.ref_name }}/Battery-${{ env.VERSION }}.zip
-          ZIP_PATH: build/Battery-${{ env.VERSION }}.zip
+          ASSET_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/${{ github.ref_name }}/PeriBattery-${{ env.VERSION }}.zip
+          ZIP_PATH: build/PeriBattery-${{ env.VERSION }}.zip
           # Written by "Fetch the live feed"; read, never re-fetched.
           CURRENT_FEED_FILE: ${{ runner.temp }}/current-appcast.xml
           # Written by "Fetch the Sparkle tools"; verified, never re-downloaded.

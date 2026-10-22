@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # release.sh — archive, export, package, notarize, staple and verify a
-# Developer ID build of Battery.
+# Developer ID build of PeriBattery.
 #
 # This is the build sequence, not a publishing path. It contains no version
 # control and no release-management invocation of any kind, so it can neither
@@ -38,12 +38,12 @@ set -euo pipefail
 readonly TEAM_ID="Z3S5JK8E38"
 readonly SCHEME="battery"
 # The Xcode target, the scheme and the Swift module are all called `battery`,
-# and so is the product: `PRODUCT_NAME = $(TARGET_NAME)` produces `battery.app`
-# with `Contents/MacOS/battery`. The two constants still mean different things:
-# `SCHEME` names what xcodebuild is asked to build, `PRODUCT` names what comes
-# out, so renaming the product later touches only `PRODUCT`. The release asset
-# keeps a capitalized name (`Battery-<version>.zip`) regardless.
-readonly PRODUCT="battery"
+# but the product is not: `PRODUCT_NAME = PeriBattery` produces `PeriBattery.app`
+# with `Contents/MacOS/PeriBattery`, because Homebrew's official `battery` cask
+# already installs `Battery.app`. `SCHEME` names what xcodebuild is asked to
+# build, `PRODUCT` names what comes out, and the release asset is named after
+# the product (`PeriBattery-<version>.zip`).
+readonly PRODUCT="PeriBattery"
 readonly PROJECT="battery.xcodeproj"
 readonly EXPORT_OPTIONS="scripts/ExportOptions.plist"
 
@@ -74,7 +74,7 @@ usage: scripts/release.sh <phase>
 phases:
   archive    Build a Release archive stamped with VERSION / BUILD_NUMBER
   export     Export a Developer ID app, then gate its version and architecture
-  package    ditto the exported app into Battery-<version>.zip
+  package    ditto the exported app into PeriBattery-<version>.zip
   notarize   Submit the archive and wait for Apple's verdict
   staple     Staple the ticket, then repackage so the asset carries it
   verify     Re-check every claim against the copy extracted from the zip
@@ -273,11 +273,14 @@ phase_verify() {
 	expect_equal \
 		"$(plutil -extract CFBundleVersion raw -o - "$VERIFIED_APP/Contents/Info.plist")" \
 		"$BUILD_NUMBER" "the delivered CFBundleVersion"
-	# The project sets no CFBundleDisplayName, so the name Finder, Sparkle and
-	# the Homebrew cask see is CFBundleName, which PRODUCT_NAME generates.
+	# Finder, Sparkle and the Homebrew cask see CFBundleName (generated from
+	# PRODUCT_NAME) and CFBundleDisplayName; both must be the product name.
 	expect_equal \
 		"$(plutil -extract CFBundleName raw -o - "$VERIFIED_APP/Contents/Info.plist")" \
 		"$PRODUCT" "the delivered CFBundleName"
+	expect_equal \
+		"$(plutil -extract CFBundleDisplayName raw -o - "$VERIFIED_APP/Contents/Info.plist")" \
+		"$PRODUCT" "the delivered CFBundleDisplayName"
 	expect_equal \
 		"$(plutil -extract CFBundleIdentifier raw -o - "$VERIFIED_APP/Contents/Info.plist")" \
 		"com.juancasanueva.battery" "the delivered CFBundleIdentifier"
@@ -346,7 +349,7 @@ main() {
 	esac
 
 	require_env VERSION
-	ZIP="$BUILD/Battery-$VERSION.zip"
+	ZIP="$BUILD/$PRODUCT-$VERSION.zip"
 
 	case "$phase" in
 	archive) phase_archive ;;

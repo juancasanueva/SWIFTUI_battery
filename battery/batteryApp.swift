@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-/// Battery lives only in the menu bar (`LSUIElement = YES`). `AppDelegate` owns the device service,
+/// PeriBattery lives only in the menu bar (`LSUIElement = YES`). `AppDelegate` owns the device service,
 /// the status item and the popover with the panel.
 @main
 struct batteryApp: App {

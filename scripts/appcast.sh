@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Build Battery's Sparkle appcast for one published release.
+# Build PeriBattery's Sparkle appcast for one published release.
 #
 # What this script is allowed to do: fetch the live feed, fetch and verify the
 # pinned signing tool, sign one zip, merge one item, and write the result to an
@@ -217,8 +217,8 @@ fetch_feed() {
 				<?xml version="1.0" encoding="UTF-8"?>
 				<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
 					<channel>
-						<title>Battery</title>
-						<description>Updates for Battery</description>
+						<title>PeriBattery</title>
+						<description>Updates for PeriBattery</description>
 						<language>en</language>
 					</channel>
 				</rss>

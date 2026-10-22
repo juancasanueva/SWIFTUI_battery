@@ -90,7 +90,7 @@ struct PanelHeader: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Battery")
+            Text("PeriBattery")
                 .font(Theme.font(.display, weight: .bold))
             Text(summary.uppercased())
                 .font(Theme.font(.caption, weight: .semibold))
@@ -160,7 +160,7 @@ struct AccessRow: View {
             EmptyView()
         case let .permissionNeeded(code):
             row(symbol: "lock.shield", title: "Permission needed",
-                detail: "Allow Input Monitoring for Battery (\(HIDPPTransport.describe(code))).") {
+                detail: "Allow Input Monitoring for PeriBattery (\(HIDPPTransport.describe(code))).") {
                 Button("Open Settings…") {
                     if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
                         NSWorkspace.shared.open(url)
@@ -250,7 +250,7 @@ struct PanelFooter: View {
             .buttonStyle(.borderless)
             .font(Theme.font(.small))
             .keyboardShortcut("q")
-            .help("Quit Battery (⌘Q)")
+            .help("Quit PeriBattery (⌘Q)")
         }
         .foregroundStyle(Theme.dim)
     }
