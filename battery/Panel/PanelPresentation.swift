@@ -19,6 +19,8 @@ final class PanelPresentation {
 
     /// Closes the popover, set by its owner.
     @ObservationIgnored var onClose: () -> Void = {}
+    /// Closes the popover and starts an update check, set by its owner.
+    @ObservationIgnored var onCheckForUpdates: () -> Void = {}
 
     init(now: @escaping () -> Date = { .now }) {
         self.now = now
@@ -41,5 +43,10 @@ final class PanelPresentation {
 
     func close() {
         onClose()
+    }
+
+    /// Sparkle shows its own window, so the owner gets the panel out of the way first.
+    func checkForUpdates() {
+        onCheckForUpdates()
     }
 }
