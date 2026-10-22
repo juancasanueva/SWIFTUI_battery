@@ -2,8 +2,8 @@ import AppKit
 import SwiftUI
 
 /// Owns the `NSStatusItem` and the popover with the panel. The button hosts the keyboard and mouse
-/// batteries as a SwiftUI view, updated whenever the device list changes; a click toggles the
-/// popover, whose arrow points at the button.
+/// batteries as a SwiftUI view, updated whenever the device list changes; a left click toggles the
+/// popover, whose arrow points at the button, and a right click shows a small menu.
 ///
 /// It is an `NSObject` subclass because AppKit needs one: the button uses target-action and the
 /// popover reports its transitions through `NSPopoverDelegate`.
@@ -12,6 +12,8 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     private let launchAtLogin: LaunchAtLogin
     /// `nil` hides the Updates card.
     private let updater: (any AppUpdating)?
+    /// Shows the About window.
+    private let openAbout: () -> Void
     private let presentation = PanelPresentation()
     private let statusItem: NSStatusItem
     private let popover = NSPopover()
@@ -20,10 +22,12 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     /// Segments currently shown; `nil` before the first draw.
     private var shownSegments: [MenuBarLabel.Segment]?
 
-    init(service: DeviceService, launchAtLogin: LaunchAtLogin, updater: (any AppUpdating)?) {
+    init(service: DeviceService, launchAtLogin: LaunchAtLogin, updater: (any AppUpdating)?,
+         openAbout: @escaping () -> Void) {
         self.service = service
         self.launchAtLogin = launchAtLogin
         self.updater = updater
+        self.openAbout = openAbout
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
 
@@ -47,7 +51,8 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             hostingView.bottomAnchor.constraint(equalTo: button.bottomAnchor),
         ])
         button.target = self
-        button.action = #selector(togglePopover)
+        button.action = #selector(handleClick(_:))
+        button.sendAction(on: [.leftMouseUp, .rightMouseUp])
     }
 
     private func configurePopover() {
@@ -56,6 +61,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         popover.delegate = self
         presentation.onClose = { [weak self] in self?.popover.performClose(nil) }
         presentation.onCheckForUpdates = { [weak self] in self?.handleCheckForUpdates() }
+        presentation.onOpenAbout = { [weak self] in self?.openAbout() }
         // Hosted for the controller's whole life; the popover follows the panel's fitting size.
         let host = NSHostingController(rootView: PanelView(service: service, presentation: presentation)
             .environment(launchAtLogin)
@@ -95,8 +101,17 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
 
     // MARK: - Popover
 
+    /// A right click opens the context menu; any other click toggles the popover.
+    @objc private func handleClick(_ sender: NSStatusBarButton) {
+        if NSApp.currentEvent?.type == .rightMouseUp {
+            showContextMenu()
+        } else {
+            togglePopover()
+        }
+    }
+
     /// Closes the popover while it is shown instead of showing it again.
-    @objc func togglePopover() {
+    func togglePopover() {
         guard let button = statusItem.button else { return }
         if popover.isShown {
             popover.performClose(nil)
@@ -123,6 +138,45 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     /// Also fires when the transient popover closes from a click outside it.
     func popoverDidClose(_ notification: Notification) {
         presentation.didClose()
+    }
+
+    // MARK: - Context menu
+
+    /// Attaches the menu, triggers the button, then detaches it, so the next left click reaches
+    /// `handleClick` instead of opening the menu.
+    private func showContextMenu() {
+        if popover.isShown { popover.performClose(nil) }
+        statusItem.menu = makeContextMenu()
+        statusItem.button?.performClick(nil)
+        statusItem.menu = nil
+    }
+
+    private func makeContextMenu() -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        for entry in ContextMenuModel.entries(canCheckForUpdates: updater?.canCheckForUpdates ?? false) {
+            switch entry {
+            case .separator:
+                menu.addItem(.separator())
+            case let .item(item):
+                let menuItem = NSMenuItem(title: item.title, action: #selector(performMenuAction(_:)),
+                                          keyEquivalent: item.keyEquivalent)
+                menuItem.target = self
+                menuItem.representedObject = item.action
+                menuItem.isEnabled = item.isEnabled
+                menu.addItem(menuItem)
+            }
+        }
+        return menu
+    }
+
+    @objc private func performMenuAction(_ sender: NSMenuItem) {
+        guard let action = sender.representedObject as? ContextMenuItem.Action else { return }
+        switch action {
+        case .openAbout: openAbout()
+        case .checkForUpdates: handleCheckForUpdates()
+        case .quit: NSApp.terminate(nil)
+        }
     }
 
     // MARK: - Updates

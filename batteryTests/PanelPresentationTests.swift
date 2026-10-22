@@ -56,4 +56,13 @@ struct PanelPresentationTests {
         presentation.close()
         #expect(closed == 1)
     }
+
+    @Test func openAboutClosesThePanelBeforeOpeningTheWindow() {
+        let presentation = makePresentation()
+        var calls: [String] = []
+        presentation.onClose = { calls.append("close") }
+        presentation.onOpenAbout = { calls.append("about") }
+        presentation.openAbout()
+        #expect(calls == ["close", "about"])
+    }
 }

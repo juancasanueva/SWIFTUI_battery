@@ -1,7 +1,7 @@
 import AppKit
 
-/// Builds the device service, the login item, the updater and the status item once the app has
-/// launched, and holds them for the life of the process.
+/// Builds the device service, the login item, the updater, the About window and the status item once
+/// the app has launched, and holds them for the life of the process.
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var deviceService: DeviceService?
     private(set) var launchAtLogin: LaunchAtLogin?
@@ -13,6 +13,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         SparkleUpdateChecker(automaticChecks: AutomaticUpdateChecks(defaults: .standard))
     }
     private(set) var statusItemController: StatusItemController?
+    /// The one About window, opened from Settings.
+    private(set) var aboutWindow: AboutWindowController?
 
     /// The unit tests use this app as their host; keep them off the real receivers and the menu bar.
     static var isHostingTests: Bool {
@@ -28,7 +30,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.launchAtLogin = launchAtLogin
         let updater = updaterFactory()
         self.updater = updater
+        let aboutWindow = AboutWindowController(
+            info: AboutModel.info(bundleInfo: Bundle.main.infoDictionary ?? [:])
+        )
+        self.aboutWindow = aboutWindow
         statusItemController = StatusItemController(service: service, launchAtLogin: launchAtLogin,
-                                                    updater: updater)
+                                                    updater: updater,
+                                                    openAbout: { [aboutWindow] in aboutWindow.show() })
     }
 }

@@ -11,7 +11,9 @@ struct SettingsView: View {
             launchAtLogin: Binding(get: { launchAtLogin.isEnabled }, set: launchAtLogin.setEnabled),
             launchNote: launchNote,
             onOpenLoginItems: { MainAppLoginItem.openSystemSettings() },
-            updates: updates
+            updates: updates,
+            // Through the popover's owner, which closes the panel before the window appears.
+            onAbout: presentation.openAbout
         )
         // The user can change the login item in System Settings at any time.
         .onAppear { launchAtLogin.refreshStatus() }
@@ -57,6 +59,7 @@ struct SettingsForm: View {
     let launchNote: String?
     let onOpenLoginItems: () -> Void
     let updates: UpdatesSettings?
+    let onAbout: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -77,6 +80,11 @@ struct SettingsForm: View {
             }
             if let updates {
                 UpdatesCard(updates: updates)
+            }
+            HStack {
+                Spacer(minLength: 8)
+                Button("About PeriBattery", action: onAbout)
+                    .buttonStyle(OutlineButtonStyle())
             }
         }
     }
@@ -110,7 +118,8 @@ struct UpdatesCard: View {
     SettingsForm(launchAtLogin: $launchAtLogin, launchNote: "Allow PeriBattery in System Settings › Login Items.",
                  onOpenLoginItems: {},
                  updates: UpdatesSettings(automaticChecks: $automaticChecks, lastChecked: "Never checked",
-                                          canCheck: true, onCheck: {}))
+                                          canCheck: true, onCheck: {}),
+                 onAbout: {})
         .padding(16)
         .frame(width: Theme.panelWidth)
         .background(Theme.background)

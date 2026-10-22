@@ -49,7 +49,7 @@ struct SettingCardFrame<Content: View>: View {
     }
 }
 
-/// Small bordered capsule button ("Open Login Items", "Check for Updates…").
+/// Small bordered capsule button ("Open Login Items", "Check for Updates…", "About PeriBattery").
 struct OutlineButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
 
