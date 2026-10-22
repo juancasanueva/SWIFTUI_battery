@@ -1,10 +1,17 @@
 import AppKit
 
-/// Builds the device service, the login item and the status item once the app has launched, and holds
-/// them for the life of the process.
+/// Builds the device service, the login item, the updater and the status item once the app has
+/// launched, and holds them for the life of the process.
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var deviceService: DeviceService?
     private(set) var launchAtLogin: LaunchAtLogin?
+    /// The one updater; `nil` in the unit-test host, where Sparkle must never start.
+    private(set) var updater: (any AppUpdating)?
+
+    /// How the updater is built; tests substitute an in-memory one.
+    var updaterFactory: @MainActor () -> any AppUpdating = {
+        SparkleUpdateChecker(automaticChecks: AutomaticUpdateChecks(defaults: .standard))
+    }
     private(set) var statusItemController: StatusItemController?
 
     /// The unit tests use this app as their host; keep them off the real receivers and the menu bar.
@@ -19,6 +26,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         service.start()
         let launchAtLogin = LaunchAtLogin(service: MainAppLoginItem())
         self.launchAtLogin = launchAtLogin
-        statusItemController = StatusItemController(service: service, launchAtLogin: launchAtLogin)
+        let updater = updaterFactory()
+        self.updater = updater
+        statusItemController = StatusItemController(service: service, launchAtLogin: launchAtLogin,
+                                                    updater: updater)
     }
 }

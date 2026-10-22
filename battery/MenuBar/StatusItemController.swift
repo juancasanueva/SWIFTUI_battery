@@ -10,13 +10,16 @@ import SwiftUI
 final class StatusItemController: NSObject, NSPopoverDelegate {
     private let service: DeviceService
     private let launchAtLogin: LaunchAtLogin
+    /// `nil` hides the Updates card.
+    private let updater: (any AppUpdating)?
     private let presentation = PanelPresentation()
     private let statusItem: NSStatusItem
     private let popover = NSPopover()
 
-    init(service: DeviceService, launchAtLogin: LaunchAtLogin) {
+    init(service: DeviceService, launchAtLogin: LaunchAtLogin, updater: (any AppUpdating)?) {
         self.service = service
         self.launchAtLogin = launchAtLogin
+        self.updater = updater
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
 
@@ -40,9 +43,12 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         popover.animates = true
         popover.delegate = self
         presentation.onClose = { [weak self] in self?.popover.performClose(nil) }
+        presentation.onCheckForUpdates = { [weak self] in self?.handleCheckForUpdates() }
         // Hosted for the controller's whole life; the popover follows the panel's fitting size.
         let host = NSHostingController(rootView: PanelView(service: service, presentation: presentation)
-            .environment(launchAtLogin))
+            .environment(launchAtLogin)
+            .environment(presentation)
+            .environment(\.appUpdater, updater))
         host.sizingOptions = .preferredContentSize
         popover.contentViewController = host
     }
@@ -107,5 +113,13 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     /// Also fires when the transient popover closes from a click outside it.
     func popoverDidClose(_ notification: Notification) {
         presentation.didClose()
+    }
+
+    // MARK: - Updates
+
+    /// Sparkle shows its own window, so the panel gets out of the way first.
+    private func handleCheckForUpdates() {
+        if popover.isShown { popover.performClose(nil) }
+        updater?.checkForUpdates()
     }
 }
