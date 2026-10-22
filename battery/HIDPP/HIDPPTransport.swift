@@ -1,0 +1,260 @@
+import Foundation
+import IOKit
+import IOKit.hid
+import os
+
+/// Thin IOKit glue: one HID++ channel per Logitech receiver vendor interface (usage page 0xFF00).
+/// Everything runs on the main run loop / main actor; one request is in flight per receiver.
+final class HIDPPTransport {
+    static let logitechVendorID = 0x046D
+    static let vendorUsagePage = 0xFF00
+    static let requestTimeout: Duration = .seconds(1)
+    private static let reportBufferSize = 64
+
+    private let logger = Logger(subsystem: "com.juancasanueva.battery", category: "transport")
+    private let manager = IOHIDManagerCreate(kCFAllocatorDefault, IOOptionBits(kIOHIDOptionsTypeNone))
+    private var channels: [UInt64: Channel] = [:]
+    private var isStarted = false
+
+    /// Called after a receiver is attached or removed.
+    var onReceiversChanged: (() -> Void)?
+    /// The first IOKit open failure, e.g. `kIOReturnNotPermitted` when access is denied.
+    private(set) var openFailure: IOReturn?
+
+    var receivers: [Receiver] {
+        channels.values.map(\.receiver).sorted { $0.productID < $1.productID }
+    }
+
+    /// Starts matching receivers. Returns the `IOHIDManagerOpen` result.
+    @discardableResult
+    func start() -> IOReturn {
+        guard !isStarted else { return kIOReturnSuccess }
+        isStarted = true
+
+        let matching: [String: Any] = [
+            kIOHIDVendorIDKey: Self.logitechVendorID,
+            kIOHIDPrimaryUsagePageKey: Self.vendorUsagePage,
+        ]
+        IOHIDManagerSetDeviceMatching(manager, matching as CFDictionary)
+        let context = Unmanaged.passUnretained(self).toOpaque()
+        IOHIDManagerRegisterDeviceMatchingCallback(manager, { context, _, _, device in
+            guard let context else { return }
+            MainActor.assumeIsolated {
+                Unmanaged<HIDPPTransport>.fromOpaque(context).takeUnretainedValue().deviceMatched(device)
+            }
+        }, context)
+        IOHIDManagerRegisterDeviceRemovalCallback(manager, { context, _, _, device in
+            guard let context else { return }
+            MainActor.assumeIsolated {
+                Unmanaged<HIDPPTransport>.fromOpaque(context).takeUnretainedValue().deviceRemoved(device)
+            }
+        }, context)
+        IOHIDManagerScheduleWithRunLoop(manager, CFRunLoopGetMain(), CFRunLoopMode.defaultMode.rawValue)
+
+        let result = IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeNone))
+        if result == kIOReturnSuccess {
+            logger.notice("IOHIDManager opened")
+        } else {
+            openFailure = openFailure ?? result
+            logger.error("IOHIDManagerOpen failed: \(Self.describe(result), privacy: .public)")
+        }
+        return result
+    }
+
+    /// Sends a long HID++ request and returns the 16-byte response payload.
+    func send(_ request: HIDPPRequest, to receiver: Receiver) async throws -> [UInt8] {
+        guard let channel = channels[receiver.id] else { throw HIDPPTransportError.receiverNotFound }
+        await channel.acquire()
+        defer { channel.release() }
+        guard !channel.isRemoved else { throw HIDPPTransportError.receiverNotFound }
+
+        return try await withCheckedThrowingContinuation { continuation in
+            let pending = PendingRequest(request: request, continuation: continuation)
+            channel.pending = pending
+
+            let bytes = request.bytes
+            let result = bytes.withUnsafeBufferPointer { buffer in
+                IOHIDDeviceSetReport(channel.device, kIOHIDReportTypeOutput, CFIndex(bytes[0]),
+                                     buffer.baseAddress!, buffer.count)
+            }
+            guard result == kIOReturnSuccess else {
+                logger.error("SetReport to \(receiver.name, privacy: .public) failed: \(Self.describe(result), privacy: .public)")
+                channel.finish(pending, with: .failure(.io(result)))
+                return
+            }
+            pending.timeoutTask = Task { [weak channel] in
+                try? await Task.sleep(for: Self.requestTimeout)
+                guard !Task.isCancelled else { return }
+                channel?.finish(pending, with: .failure(.timeout))
+            }
+        }
+    }
+
+    // MARK: - IOKit callbacks
+
+    private func deviceMatched(_ device: IOHIDDevice) {
+        let id = Self.registryID(of: device)
+        guard channels[id] == nil else { return }
+
+        let productID = Self.intProperty(device, kIOHIDProductIDKey) ?? 0
+        let productString = IOHIDDeviceGetProperty(device, kIOHIDProductKey as CFString) as? String
+        let receiver = Receiver(id: id, productID: productID,
+                                name: Receiver.displayName(productID: productID, productString: productString))
+
+        let openResult = IOHIDDeviceOpen(device, IOOptionBits(kIOHIDOptionsTypeNone))
+        guard openResult == kIOReturnSuccess else {
+            openFailure = openFailure ?? openResult
+            logger.error("IOHIDDeviceOpen \(receiver.name, privacy: .public) failed: \(Self.describe(openResult), privacy: .public)")
+            onReceiversChanged?()
+            return
+        }
+
+        let channel = Channel(device: device, receiver: receiver, bufferSize: Self.reportBufferSize)
+        channel.onReport = { [weak self, weak channel] report in
+            guard let self, let channel else { return }
+            self.handle(report, on: channel)
+        }
+        channel.registerInputCallback()
+        channels[id] = channel
+        logger.notice("""
+            Receiver found: \(receiver.name, privacy: .public) \
+            (PID 0x\(String(productID, radix: 16), privacy: .public), \
+            usage 0x\(String(Self.intProperty(device, kIOHIDPrimaryUsageKey) ?? 0, radix: 16), privacy: .public))
+            """)
+        onReceiversChanged?()
+    }
+
+    private func deviceRemoved(_ device: IOHIDDevice) {
+        guard let channel = channels.removeValue(forKey: Self.registryID(of: device)) else { return }
+        logger.notice("Receiver removed: \(channel.receiver.name, privacy: .public)")
+        channel.invalidate()
+        onReceiversChanged?()
+    }
+
+    private func handle(_ report: [UInt8], on channel: Channel) {
+        if !channel.loggedFirstReport {
+            channel.loggedFirstReport = true
+            let head = report.prefix(8).map { String(format: "%02X", $0) }.joined(separator: " ")
+            logger.notice("First input report from \(channel.receiver.name, privacy: .public): \(head, privacy: .public)")
+        }
+        guard let pending = channel.pending else { return }
+        let match = pending.request.match(report)
+        switch match {
+        case .noMatch:
+            return
+        case let .response(payload):
+            channel.finish(pending, with: .success(payload))
+        case .error:
+            channel.finish(pending, with: .failure(HIDPPTransportError(match: match) ?? .timeout))
+        }
+    }
+
+    // MARK: - Helpers
+
+    private static func registryID(of device: IOHIDDevice) -> UInt64 {
+        var id: UInt64 = 0
+        IORegistryEntryGetRegistryEntryID(IOHIDDeviceGetService(device), &id)
+        return id
+    }
+
+    private static func intProperty(_ device: IOHIDDevice, _ key: String) -> Int? {
+        IOHIDDeviceGetProperty(device, key as CFString) as? Int
+    }
+
+    static func describe(_ result: IOReturn) -> String {
+        String(format: "0x%08X", UInt32(bitPattern: result))
+    }
+}
+
+// MARK: - Per-receiver state
+
+private final class PendingRequest {
+    let request: HIDPPRequest
+    var timeoutTask: Task<Void, Never>?
+    private var continuation: CheckedContinuation<[UInt8], any Error>?
+
+    init(request: HIDPPRequest, continuation: CheckedContinuation<[UInt8], any Error>) {
+        self.request = request
+        self.continuation = continuation
+    }
+
+    /// Resumes exactly once; later calls (timeout racing a response, removal) are ignored.
+    func complete(with result: Result<[UInt8], HIDPPTransportError>) {
+        guard let continuation else { return }
+        self.continuation = nil
+        timeoutTask?.cancel()
+        timeoutTask = nil
+        continuation.resume(with: result.mapError { $0 as any Error })
+    }
+}
+
+private final class Channel {
+    let device: IOHIDDevice
+    let receiver: Receiver
+    var pending: PendingRequest?
+    var onReport: (([UInt8]) -> Void)?
+    var loggedFirstReport = false
+    private(set) var isRemoved = false
+
+    private let buffer: UnsafeMutablePointer<UInt8>
+    private let bufferSize: Int
+    private var isBusy = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    init(device: IOHIDDevice, receiver: Receiver, bufferSize: Int) {
+        self.device = device
+        self.receiver = receiver
+        self.bufferSize = bufferSize
+        buffer = .allocate(capacity: bufferSize)
+        buffer.initialize(repeating: 0, count: bufferSize)
+    }
+
+    deinit {
+        buffer.deallocate()
+    }
+
+    func registerInputCallback() {
+        let context = Unmanaged.passUnretained(self).toOpaque()
+        IOHIDDeviceRegisterInputReportCallback(device, buffer, bufferSize, { context, _, _, _, reportID, report, length in
+            guard let context else { return }
+            let bytes = HIDPPInputReport.normalize(Array(UnsafeBufferPointer(start: report, count: length)),
+                                                   reportID: reportID)
+            MainActor.assumeIsolated {
+                let channel = Unmanaged<Channel>.fromOpaque(context).takeUnretainedValue()
+                channel.onReport?(bytes)
+            }
+        }, context)
+    }
+
+    /// Waits until no other request is in flight on this receiver.
+    func acquire() async {
+        guard isBusy else {
+            isBusy = true
+            return
+        }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+
+    /// Hands the channel to the next waiter (still busy) or marks it idle.
+    func release() {
+        if waiters.isEmpty {
+            isBusy = false
+        } else {
+            waiters.removeFirst().resume()
+        }
+    }
+
+    func finish(_ request: PendingRequest, with result: Result<[UInt8], HIDPPTransportError>) {
+        if pending === request { pending = nil }
+        request.complete(with: result)
+    }
+
+    /// Fails the pending request, wakes waiters (they see `isRemoved`), and stops IOKit callbacks.
+    func invalidate() {
+        isRemoved = true
+        if let pending { finish(pending, with: .failure(.receiverNotFound)) }
+        onReport = nil
+        IOHIDDeviceRegisterInputReportCallback(device, buffer, bufferSize, nil, nil)
+        IOHIDDeviceClose(device, IOOptionBits(kIOHIDOptionsTypeNone))
+    }
+}
