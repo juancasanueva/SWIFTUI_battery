@@ -24,6 +24,29 @@ nonisolated enum BatteryGauge {
         battery.reading?.percent.map(level(forPercent:))
     }
 
+    /// How strongly a percentage label calls attention to a low battery: red at
+    /// `lowEmphasisThreshold` or less, red and bold at `criticalEmphasisThreshold` or less.
+    enum Emphasis: Sendable, Equatable {
+        case normal
+        case low
+        case critical
+    }
+
+    static let lowEmphasisThreshold = 10
+    static let criticalEmphasisThreshold = 5
+
+    /// An unknown level is never emphasized.
+    static func emphasis(forPercent percent: Int?) -> Emphasis {
+        guard let percent else { return .normal }
+        if percent <= criticalEmphasisThreshold { return .critical }
+        if percent <= lowEmphasisThreshold { return .low }
+        return .normal
+    }
+
+    static func emphasis(for battery: BatteryState) -> Emphasis {
+        emphasis(forPercent: battery.reading?.percent)
+    }
+
     /// How much of the bar to fill, 0...1; `nil` when the level is unknown and the bar stays empty.
     static func fill(for battery: BatteryState) -> Double? {
         guard let percent = battery.reading?.percent else { return nil }

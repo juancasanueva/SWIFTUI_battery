@@ -29,7 +29,7 @@ struct DeviceCard: View {
                             .accessibilityHidden(true)
                     }
                     Text(MenuBarLabel.rowStatus(for: device.battery))
-                        .font(Theme.font(.small, weight: .semibold))
+                        .font(Theme.font(.small, weight: emphasis == .critical ? .bold : .semibold))
                         .foregroundStyle(statusColor)
                         .contentTransition(.numericText())
                         .lineLimit(1)
@@ -61,8 +61,14 @@ struct DeviceCard: View {
         }
     }
 
+    /// Red at 10% or less, red and bold at 5% or less.
+    private var emphasis: BatteryGauge.Emphasis {
+        BatteryGauge.emphasis(for: device.battery)
+    }
+
     private var statusColor: Color {
-        device.battery.reading == nil ? Theme.dim : Theme.foreground
+        if device.battery.reading == nil { return Theme.dim }
+        return emphasis == .normal ? Theme.foreground : Theme.urgent
     }
 }
 

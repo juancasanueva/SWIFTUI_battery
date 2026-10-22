@@ -40,3 +40,23 @@ struct BatteryGaugeTests {
         #expect(BatteryGauge.summary(deviceCount: count) == expected)
     }
 }
+
+@Suite("Low battery emphasis")
+struct LowBatteryEmphasisTests {
+    @Test(arguments: [(100, BatteryGauge.Emphasis.normal), (11, .normal), (10, .low), (6, .low),
+                      (5, .critical), (1, .critical), (0, .critical)])
+    func emphasisFollowsThePercent(percent: Int, expected: BatteryGauge.Emphasis) {
+        #expect(BatteryGauge.emphasis(forPercent: percent) == expected)
+    }
+
+    @Test func anUnknownLevelIsNotEmphasized() {
+        #expect(BatteryGauge.emphasis(forPercent: nil) == .normal)
+        #expect(BatteryGauge.emphasis(for: .unavailable) == .normal)
+        #expect(BatteryGauge.emphasis(for: reading(nil, .charging)) == .normal)
+    }
+
+    @Test func aReadingUsesItsPercent() {
+        #expect(BatteryGauge.emphasis(for: reading(4)) == .critical)
+        #expect(BatteryGauge.emphasis(for: reading(9, .charging)) == .low)
+    }
+}
