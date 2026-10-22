@@ -39,6 +39,22 @@ struct HIDPPReportTests {
         #expect(request.match(report) == .noMatch)
     }
 
+    @Test func shortReportThatIsNotAnErrorDoesNotMatchLongRequest() {
+        // Echoes device, feature and function exactly, but a short report is only meaningful as a 0x8F error.
+        let report: [UInt8] = [0x10, 0x02, 0x05, 0x1B, 0x01, 0x02, 0x03]
+        #expect(request.match(report) == .noMatch)
+    }
+
+    @Test func longResponseWithDifferentSoftwareIDDoesNotMatch() {
+        let report: [UInt8] = [0x11, 0x02, 0x05, 0x10 | 0x0A] + Array(1...16)
+        #expect(request.match(report) == .noMatch)
+    }
+
+    @Test func hidpp10ErrorWithDifferentSoftwareIDDoesNotMatch() {
+        let report: [UInt8] = [0x10, 0x02, 0x8F, 0x05, 0x1A, 0x09, 0x00]
+        #expect(request.match(report) == .noMatch)
+    }
+
     @Test func decodesHIDPP20Error() {
         let report: [UInt8] = [0x11, 0x02, 0xFF, 0x05, 0x1B, 0x07] + Array(repeating: 0, count: 14)
         let result = request.match(report)

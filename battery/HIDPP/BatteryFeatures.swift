@@ -5,6 +5,8 @@ nonisolated enum ChargingState: Sendable, Equatable {
 }
 
 nonisolated struct BatteryReading: Sendable, Equatable {
+    static let percentRange: ClosedRange<Int> = 0...100
+
     let percent: Int
     /// True when the percentage is derived from a coarse level or a voltage curve.
     let isApproximate: Bool
@@ -40,7 +42,7 @@ nonisolated enum UnifiedBattery {
         let chargingState = chargingState(code: payload[2])
 
         if supportsStateOfCharge, payload[0] > 0 {
-            return BatteryReading(percent: Int(payload[0]), isApproximate: false, chargingState: chargingState)
+            return BatteryReading(percent: clampedPercent(payload[0]), isApproximate: false, chargingState: chargingState)
         }
         guard let level = levelPercents.first(where: { payload[1] & $0.bit != 0 }) else { return nil }
         return BatteryReading(percent: level.percent, isApproximate: true, chargingState: chargingState)
@@ -66,7 +68,8 @@ nonisolated enum BatteryStatus {
 
     static func parseStatus(_ payload: [UInt8]) -> BatteryReading? {
         guard payload.count >= 3 else { return nil }
-        return BatteryReading(percent: Int(payload[0]), isApproximate: false, chargingState: chargingState(code: payload[2]))
+        return BatteryReading(percent: clampedPercent(payload[0]), isApproximate: false,
+                              chargingState: chargingState(code: payload[2]))
     }
 
     private static func chargingState(code: UInt8) -> ChargingState {
@@ -84,6 +87,8 @@ nonisolated enum BatteryStatus {
 /// Feature 0x1001 BatteryVoltage.
 nonisolated enum BatteryVoltage {
     private static let chargingFlag: UInt8 = 0x80
+    /// Readings outside this window are not a real Li-ion cell voltage (e.g. 0 mV while the device wakes up).
+    static let plausibleMillivolts: ClosedRange<Int> = 3000...4500
 
     /// Li-ion discharge curve, highest voltage first (millivolts, percent).
     private static let curve: [(millivolts: Int, percent: Int)] = [
@@ -98,6 +103,7 @@ nonisolated enum BatteryVoltage {
     static func parseVoltage(_ payload: [UInt8]) -> BatteryReading? {
         guard payload.count >= 3 else { return nil }
         let millivolts = Int(payload[0]) << 8 | Int(payload[1])
+        guard plausibleMillivolts.contains(millivolts) else { return nil }
         let state: ChargingState = payload[2] & chargingFlag != 0 ? .charging : .discharging
         return BatteryReading(percent: percent(forMillivolts: millivolts), isApproximate: true, chargingState: state)
     }
@@ -114,4 +120,9 @@ nonisolated enum BatteryVoltage {
         }
         return bottom.percent
     }
+}
+
+/// Devices sometimes report bytes above 100; never surface them as more than 100%.
+nonisolated private func clampedPercent(_ byte: UInt8) -> Int {
+    min(max(Int(byte), BatteryReading.percentRange.lowerBound), BatteryReading.percentRange.upperBound)
 }
