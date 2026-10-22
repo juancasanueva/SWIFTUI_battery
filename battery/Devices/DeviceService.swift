@@ -21,7 +21,10 @@ final class DeviceService {
         }
     }
 
-    private(set) var devices: [LogitechDevice] = []
+    /// Every interface and slot that answered, including a wired device's twin behind its receiver.
+    private(set) var allDevices: [LogitechDevice] = []
+    /// What the panel and menu bar show: each physical device once.
+    var devices: [LogitechDevice] { allDevices.mergingTwins() }
     private(set) var receivers: [Receiver] = []
     private(set) var access: AccessState = .ok
     private(set) var isRefreshing = false
@@ -70,7 +73,7 @@ final class DeviceService {
         repeat {
             refreshAgain = false
             let read = await readAllDevices()
-            devices = read.attached(to: Set(transport.receivers.map(\.id)))
+            allDevices = read.attached(to: Set(transport.receivers.map(\.id)))
         } while refreshAgain
         lastRefreshed = .now
     }
@@ -80,7 +83,7 @@ final class DeviceService {
         let attached = Set(receivers.map(\.id))
         slots.retain(receivers: attached)
         interfaceKinds = interfaceKinds.filter { attached.contains($0.key) }
-        devices = devices.attached(to: attached)
+        allDevices = allDevices.attached(to: attached)
         updateAccess()
         scheduleRefresh()
     }
@@ -177,15 +180,16 @@ final class DeviceService {
                 }
                 // Seen before: list it as unavailable and identify it again once it answers.
                 return LogitechDevice(receiver: receiver, deviceIndex: index, name: last.displayName(deviceIndex: index),
-                                      kind: last.kind, battery: .unavailable, connection: connection)
+                                      kind: last.kind, battery: .unavailable, connection: connection, unitID: last.unitID)
             }
             logger.notice("""
                 Device discovered on \(receiver.name, privacy: .public) #\(index, privacy: .public): \
-                \(identity.displayName(deviceIndex: index), privacy: .public) (\(String(describing: identity.kind), privacy: .public))
+                \(identity.displayName(deviceIndex: index), privacy: .public) (\(String(describing: identity.kind), privacy: .public)), \
+                unit \(identity.unitID.map { String(format: "%08X", $0) } ?? "unknown", privacy: .public)
                 """)
         }
 
-        let previous = devices.first { $0.receiver.id == receiver.id && $0.deviceIndex == index }?.battery
+        let previous = allDevices.first { $0.receiver.id == receiver.id && $0.deviceIndex == index }?.battery
         let battery = await probe.readBattery().fillingUnknownPercent(from: previous)
         if battery == .unavailable {
             // Stopped answering: whatever answers in this slot next is identified from scratch.
@@ -196,7 +200,7 @@ final class DeviceService {
         let name = identity.displayName(deviceIndex: index)
         logger.notice("Battery \(name, privacy: .public): \(Self.describe(battery), privacy: .public)")
         return LogitechDevice(receiver: receiver, deviceIndex: index, name: name, kind: identity.kind, battery: battery,
-                              connection: connection)
+                              connection: connection, unitID: identity.unitID)
     }
 
     private static func describe(_ result: Result<DeviceIdentity, any Error>) -> String {

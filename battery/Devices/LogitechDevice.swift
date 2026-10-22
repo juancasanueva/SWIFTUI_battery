@@ -39,6 +39,14 @@ nonisolated extension BatteryState {
 nonisolated struct DeviceIdentity: Sendable, Equatable {
     let name: String?
     let kind: DeviceKind
+    /// From 0x0003 Device Information; identifies one physical device across receiver and cable.
+    let unitID: UInt32?
+
+    init(name: String?, kind: DeviceKind, unitID: UInt32? = nil) {
+        self.name = name
+        self.kind = kind
+        self.unitID = unitID
+    }
 
     /// Used when a reachable device cannot report its name or kind.
     static let fallback = DeviceIdentity(name: nil, kind: .unknown)
@@ -69,6 +77,7 @@ nonisolated struct LogitechDevice: Sendable, Equatable, Identifiable {
     let kind: DeviceKind
     let battery: BatteryState
     var connection: DeviceConnection = .receiver
+    var unitID: UInt32?
 
     var id: String { "\(receiver.id)-\(deviceIndex)" }
 
