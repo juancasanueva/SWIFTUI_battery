@@ -68,6 +68,20 @@ struct MenuBarLabelTests {
         #expect(MenuBarLabel.rowStatus(for: battery) == expected)
     }
 
+    @Test func showsOnlyTheChargingIndicatorWhenTheLevelIsUnknown() {
+        let unknown = BatteryState.reading(BatteryReading(percent: nil, isApproximate: false, chargingState: .charging),
+                                           source: .batteryStatus)
+        let segments = MenuBarLabel.segments(for: [device(.keyboard, unknown)])
+        #expect(segments == [.init(symbol: "keyboard", text: "", isCharging: true)])
+        #expect(MenuBarLabel.accessibilityText(for: segments) == "Keyboard charging")
+        #expect(MenuBarLabel.rowStatus(for: unknown) == "Charging")
+    }
+
+    @Test func showsACarriedOverPercentAsApproximateWhileCharging() {
+        let segments = MenuBarLabel.segments(for: [device(.keyboard, reading(50, approximate: true, .charging))])
+        #expect(segments == [.init(symbol: "keyboard", text: "~50%", isCharging: true)])
+    }
+
     @Test(arguments: [
         (DeviceKind.keyboard, "keyboard"), (.mouse, "computermouse"), (.trackpad, "computermouse"),
         (.numpad, "keyboard"), (.unknown, "questionmark.circle"),

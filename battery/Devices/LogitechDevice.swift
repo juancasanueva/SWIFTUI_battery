@@ -25,6 +25,17 @@ nonisolated enum BatteryState: Sendable, Equatable {
     case unsupported
 }
 
+nonisolated extension BatteryState {
+    /// A charging reading without a level borrows the previous percent of the same device, marked approximate.
+    func fillingUnknownPercent(from previous: BatteryState?) -> BatteryState {
+        guard case let .reading(reading, source) = self, reading.percent == nil,
+              case let .reading(last, _)? = previous, let percent = last.percent
+        else { return self }
+        return .reading(BatteryReading(percent: percent, isApproximate: true, chargingState: reading.chargingState),
+                        source: source)
+    }
+}
+
 nonisolated struct DeviceIdentity: Sendable, Equatable {
     let name: String?
     let kind: DeviceKind
@@ -50,4 +61,11 @@ nonisolated struct LogitechDevice: Sendable, Equatable, Identifiable {
     let battery: BatteryState
 
     var id: String { "\(receiver.id)-\(deviceIndex)" }
+}
+
+nonisolated extension Array where Element == LogitechDevice {
+    /// Drops devices whose receiver is no longer attached, so a re-enumerated receiver never lists its devices twice.
+    func attached(to receiverIDs: Set<UInt64>) -> [LogitechDevice] {
+        filter { receiverIDs.contains($0.receiver.id) }
+    }
 }

@@ -95,10 +95,14 @@ final class HIDPPTransport {
     // MARK: - IOKit callbacks
 
     private func deviceMatched(_ device: IOHIDDevice) {
+        // Captured once: a terminated device may no longer resolve its registry entry.
         let id = Self.registryID(of: device)
         guard channels[id] == nil else { return }
 
-        let productID = Self.intProperty(device, kIOHIDProductIDKey) ?? 0
+        let fingerprint = Self.fingerprint(of: device)
+        dropStaleChannels(replacedBy: ChannelSnapshot(id: id, fingerprint: fingerprint, isServiceValid: true))
+
+        let productID = fingerprint.productID
         let productString = IOHIDDeviceGetProperty(device, kIOHIDProductKey as CFString) as? String
         let receiver = Receiver(id: id, productID: productID,
                                 name: Receiver.displayName(productID: productID, productString: productString))
@@ -111,7 +115,7 @@ final class HIDPPTransport {
             return
         }
 
-        let channel = Channel(device: device, receiver: receiver, bufferSize: Self.reportBufferSize)
+        let channel = Channel(device: device, receiver: receiver, fingerprint: fingerprint, bufferSize: Self.reportBufferSize)
         channel.onReport = { [weak self, weak channel] report in
             guard let self, let channel else { return }
             self.handle(report, on: channel)
@@ -121,16 +125,34 @@ final class HIDPPTransport {
         logger.notice("""
             Receiver found: \(receiver.name, privacy: .public) \
             (PID 0x\(String(productID, radix: 16), privacy: .public), \
-            usage 0x\(String(Self.intProperty(device, kIOHIDPrimaryUsageKey) ?? 0, radix: 16), privacy: .public))
+            usage 0x\(String(fingerprint.primaryUsage, radix: 16), privacy: .public))
             """)
         onReceiversChanged?()
     }
 
+    /// Matches the dead device by identity instead of asking it for its registry entry ID.
     private func deviceRemoved(_ device: IOHIDDevice) {
-        guard let channel = channels.removeValue(forKey: Self.registryID(of: device)) else { return }
+        guard let id = channels.first(where: { CFEqual($0.value.device, device) })?.key,
+              let channel = channels.removeValue(forKey: id)
+        else {
+            logger.notice("Receiver removal for an unknown device; \(self.channels.count, privacy: .public) channel(s) kept")
+            return
+        }
         logger.notice("Receiver removed: \(channel.receiver.name, privacy: .public)")
         channel.invalidate()
         onReceiversChanged?()
+    }
+
+    /// Safety net for re-enumeration without a removal callback: the old channel would otherwise live forever.
+    private func dropStaleChannels(replacedBy matched: ChannelSnapshot) {
+        let snapshots = channels.values.map {
+            ChannelSnapshot(id: $0.receiver.id, fingerprint: $0.fingerprint, isServiceValid: Self.isServiceValid($0.device))
+        }
+        for id in ReceiverBookkeeping.staleChannelIDs(existing: snapshots, matched: matched) {
+            guard let channel = channels.removeValue(forKey: id) else { continue }
+            logger.notice("Dropping stale receiver: \(channel.receiver.name, privacy: .public)")
+            channel.invalidate()
+        }
     }
 
     private func handle(_ report: [UInt8], on channel: Channel) {
@@ -161,6 +183,18 @@ final class HIDPPTransport {
         var id: UInt64 = 0
         IORegistryEntryGetRegistryEntryID(IOHIDDeviceGetService(device), &id)
         return id
+    }
+
+    private static func fingerprint(of device: IOHIDDevice) -> ReceiverFingerprint {
+        ReceiverFingerprint(productID: intProperty(device, kIOHIDProductIDKey) ?? 0,
+                            locationID: intProperty(device, kIOHIDLocationIDKey),
+                            primaryUsage: intProperty(device, kIOHIDPrimaryUsageKey) ?? 0)
+    }
+
+    /// A terminated device's service is detached from the registry.
+    private static func isServiceValid(_ device: IOHIDDevice) -> Bool {
+        let service = IOHIDDeviceGetService(device)
+        return service != IO_OBJECT_NULL && IORegistryEntryInPlane(service, kIOServicePlane) != 0
     }
 
     private static func intProperty(_ device: IOHIDDevice, _ key: String) -> Int? {
@@ -197,6 +231,7 @@ private final class PendingRequest {
 private final class Channel {
     let device: IOHIDDevice
     let receiver: Receiver
+    let fingerprint: ReceiverFingerprint
     var pending: PendingRequest?
     var onReport: (([UInt8]) -> Void)?
     var loggedFirstReport = false
@@ -207,9 +242,10 @@ private final class Channel {
     private var isBusy = false
     private var waiters: [CheckedContinuation<Void, Never>] = []
 
-    init(device: IOHIDDevice, receiver: Receiver, bufferSize: Int) {
+    init(device: IOHIDDevice, receiver: Receiver, fingerprint: ReceiverFingerprint, bufferSize: Int) {
         self.device = device
         self.receiver = receiver
+        self.fingerprint = fingerprint
         self.bufferSize = bufferSize
         buffer = .allocate(capacity: bufferSize)
         buffer.initialize(repeating: 0, count: bufferSize)
