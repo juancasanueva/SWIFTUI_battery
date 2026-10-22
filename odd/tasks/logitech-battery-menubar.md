@@ -48,5 +48,8 @@ macOS does not expose battery levels for devices paired to Logitech receivers. T
 - T1 `70fba77` feat: turn app into menu bar extra with USB access. `MenuBarExtra` shell, SwiftData template removed, `INFOPLIST_KEY_LSUIElement = YES`, `ENABLE_RESOURCE_ACCESS_USB = YES` (honored; no entitlements file needed). Evidence: `xcodebuild build` → BUILD SUCCEEDED; `codesign -d --entitlements -` on the Debug app shows `com.apple.security.app-sandbox` and `com.apple.security.device.usb` = true; built Info.plist `LSUIElement` = true.
 - T2 (commit with this doc update) feat: add HID++ 2.0 protocol core with battery parsers. `battery/HIDPP/` (`HIDPPReport.swift`, `HIDPPFeatures.swift`, `BatteryFeatures.swift`), all `nonisolated` Sendable value types. RED: test target failed to compile (`cannot find 'ChargingState'/'DeviceKind' in scope`). GREEN: `xcodebuild ... -only-testing:batteryTests test` → TEST SUCCEEDED, 87 test cases passed, 0 failed. Placeholder test removed. 0x1001 readings are marked `isApproximate = true`.
 
+- RDD slice 1 (`c8d4be8..545465a`): risk medium, review due (`slice_budget_reached`), consent granted, reliability lens APPROVED and acknowledged (lineage `review-60d45d04954453b5`). Reviewed boundary advances to `545465a`.
+- Advisory (non-blocking) findings, folded into T3: clamp 0x1000/0x1004 percent to 0...100 (`R3-percent-unclamped`), treat implausible 0x1001 voltage as unknown (`R3-zero-voltage`), test short-vs-long report matching (`R3-short-long-report-untested`).
+
 ## Next step
 T3 (IOKit transport + device service).
