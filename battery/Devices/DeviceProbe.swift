@@ -36,6 +36,23 @@ struct DeviceProbe {
         self.send = send
     }
 
+    enum IdentityOutcome: Equatable {
+        case identified(DeviceIdentity)
+        /// The device answered but its name or kind could not be read; show it as `DeviceIdentity.fallback`.
+        case fallback
+        /// The slot is empty or the device is asleep, out of range, or switched off.
+        case unreachable
+    }
+
+    /// Only errors meaning the device could not be reached hide it; any other identity error keeps a reachable device.
+    static func identityOutcome(_ result: Result<DeviceIdentity, any Error>) -> IdentityOutcome {
+        switch result {
+        case let .success(identity): .identified(identity)
+        case let .failure(error as HIDPPTransportError) where error.meansDeviceUnreachable: .unreachable
+        case .failure: .fallback
+        }
+    }
+
     /// Name and kind via 0x0005. Throws when the device cannot be reached.
     mutating func readIdentity() async throws -> DeviceIdentity {
         guard let index = try await featureIndex(.deviceNameType) else {

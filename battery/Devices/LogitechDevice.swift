@@ -29,6 +29,9 @@ nonisolated struct DeviceIdentity: Sendable, Equatable {
     let name: String?
     let kind: DeviceKind
 
+    /// Used when a reachable device cannot report its name or kind.
+    static let fallback = DeviceIdentity(name: nil, kind: .unknown)
+
     func displayName(deviceIndex: UInt8) -> String {
         if let name = name?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty { return name }
         switch kind {

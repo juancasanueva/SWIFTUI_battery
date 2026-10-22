@@ -109,14 +109,27 @@ final class DeviceService {
         }
 
         let identity: DeviceIdentity
+        var isIdentityCacheable = true
         if let cached = known[key]?.identity {
             identity = cached
         } else {
+            let result: Result<DeviceIdentity, any Error>
             do {
-                identity = try await probe.readIdentity()
+                result = .success(try await probe.readIdentity())
             } catch {
+                result = .failure(error)
+            }
+            switch DeviceProbe.identityOutcome(result) {
+            case let .identified(read):
+                identity = read
+            case .fallback:
+                // Reachable, but 0x0005 failed: keep the device and ask for its name again next refresh.
+                logger.notice("\(receiver.name, privacy: .public) #\(index, privacy: .public): name lookup failed (\(Self.describe(result), privacy: .public))")
+                identity = .fallback
+                isIdentityCacheable = false
+            case .unreachable:
                 // Unpaired slot, or a device that has been asleep since launch.
-                logger.debug("\(receiver.name, privacy: .public) #\(index, privacy: .public): no answer (\(String(describing: error), privacy: .public))")
+                logger.debug("\(receiver.name, privacy: .public) #\(index, privacy: .public): no answer (\(Self.describe(result), privacy: .public))")
                 return nil
             }
             logger.notice("""
@@ -126,10 +139,19 @@ final class DeviceService {
         }
 
         let battery = await probe.readBattery()
-        known[key] = KnownDevice(identity: identity, features: probe.features)
+        if isIdentityCacheable {
+            known[key] = KnownDevice(identity: identity, features: probe.features)
+        }
         let name = identity.displayName(deviceIndex: index)
         logger.notice("Battery \(name, privacy: .public): \(Self.describe(battery), privacy: .public)")
         return LogitechDevice(receiver: receiver, deviceIndex: index, name: name, kind: identity.kind, battery: battery)
+    }
+
+    private static func describe(_ result: Result<DeviceIdentity, any Error>) -> String {
+        switch result {
+        case let .success(identity): String(describing: identity)
+        case let .failure(error): String(describing: error)
+        }
     }
 
     private static func describe(_ battery: BatteryState) -> String {
