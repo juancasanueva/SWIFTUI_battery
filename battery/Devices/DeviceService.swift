@@ -120,6 +120,12 @@ final class DeviceService {
         var result: [LogitechDevice] = []
         for receiver in receivers {
             let kind = await interfaceKind(of: receiver)
+            if kind == .unknown {
+                // Not probed this refresh: keep what this interface listed last time instead of
+                // dropping its devices until the next refresh classifies it.
+                result += allDevices.filter { $0.receiver.id == receiver.id }
+                continue
+            }
             for index in kind.deviceIndices {
                 if let device = await readDevice(index, on: receiver, kind: kind) { result.append(device) }
             }
@@ -138,8 +144,12 @@ final class DeviceService {
         }
         let classification = InterfaceClassification.classify(result)
         if classification.isDefinitive { interfaceKinds[receiver.id] = classification.kind }
-        let kindName = classification.kind == .directDevice ? "direct device" : "receiver"
-        let note = classification.isDefinitive ? "" : " (no answer, will ask again)"
+        let kindName = switch classification.kind {
+        case .directDevice: "direct device"
+        case .receiver: "receiver"
+        case .unknown: "unknown"
+        }
+        let note = classification.isDefinitive ? "" : " (no answer, not probed; will ask again)"
         logger.notice("Interface \(receiver.name, privacy: .public) classified as \(kindName, privacy: .public)\(note, privacy: .public)")
         return classification.kind
     }
