@@ -49,6 +49,11 @@ struct UnifiedBatteryTests {
         #expect(reading?.isApproximate == true)
     }
 
+    @Test func clampsOutOfRangePercent() {
+        let reading = UnifiedBattery.parseStatus(payload(200, 0x04, 0), supportsStateOfCharge: true)
+        #expect(reading == BatteryReading(percent: 100, isApproximate: false, chargingState: .discharging))
+    }
+
     @Test func returnsNilWithoutPercentOrLevel() {
         #expect(UnifiedBattery.parseStatus(payload(0, 0, 0), supportsStateOfCharge: true) == nil)
         #expect(UnifiedBattery.parseStatus([1, 2], supportsStateOfCharge: true) == nil)
@@ -72,6 +77,10 @@ struct BatteryStatusTests {
 
     @Test func rejectsShortPayload() {
         #expect(BatteryStatus.parseStatus([45, 30]) == nil)
+    }
+
+    @Test func clampsOutOfRangePercent() {
+        #expect(BatteryStatus.parseStatus(payload(200, 0, 0))?.percent == 100)
     }
 }
 
@@ -113,5 +122,16 @@ struct BatteryVoltageTests {
 
     @Test func rejectsShortPayload() {
         #expect(BatteryVoltage.parseVoltage([0x0E]) == nil)
+    }
+
+    @Test(arguments: [0, 1500, 2999, 4501, 0xFFFF])
+    func treatsImplausibleVoltageAsUnknown(millivolts: Int) {
+        let reading = BatteryVoltage.parseVoltage(payload(UInt8(millivolts >> 8), UInt8(millivolts & 0xFF), 0))
+        #expect(reading == nil)
+    }
+
+    @Test(arguments: [3000, 4500])
+    func acceptsVoltageAtPlausibleBounds(millivolts: Int) {
+        #expect(BatteryVoltage.parseVoltage(payload(UInt8(millivolts >> 8), UInt8(millivolts & 0xFF), 0)) != nil)
     }
 }
