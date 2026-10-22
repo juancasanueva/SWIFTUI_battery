@@ -9,12 +9,14 @@ import SwiftUI
 /// popover reports its transitions through `NSPopoverDelegate`.
 final class StatusItemController: NSObject, NSPopoverDelegate {
     private let service: DeviceService
+    private let launchAtLogin: LaunchAtLogin
     private let presentation = PanelPresentation()
     private let statusItem: NSStatusItem
     private let popover = NSPopover()
 
-    init(service: DeviceService) {
+    init(service: DeviceService, launchAtLogin: LaunchAtLogin) {
         self.service = service
+        self.launchAtLogin = launchAtLogin
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
 
@@ -39,7 +41,8 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         popover.delegate = self
         presentation.onClose = { [weak self] in self?.popover.performClose(nil) }
         // Hosted for the controller's whole life; the popover follows the panel's fitting size.
-        let host = NSHostingController(rootView: PanelView(service: service, presentation: presentation))
+        let host = NSHostingController(rootView: PanelView(service: service, presentation: presentation)
+            .environment(launchAtLogin))
         host.sizingOptions = .preferredContentSize
         popover.contentViewController = host
     }
@@ -88,8 +91,10 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         }
     }
 
-    /// Every open reads the batteries again.
+    /// Every open reads the batteries and the login item again; the user can change the login item in
+    /// System Settings while the panel is closed.
     func popoverWillShow(_ notification: Notification) {
+        launchAtLogin.refreshStatus()
         Task { await service.refresh() }
     }
 

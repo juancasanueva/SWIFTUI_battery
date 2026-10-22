@@ -1,16 +1,37 @@
 import AppKit
 import SwiftUI
 
-/// Container: reads the service and handles the keyboard. The popover's owner refreshes on every open.
+/// The panel's tabs, in tab bar order.
+nonisolated enum PanelTab: String, CaseIterable, Identifiable, Sendable {
+    case devices, settings
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .devices: "Devices"
+        case .settings: "Settings"
+        }
+    }
+}
+
+/// Container: reads the service, holds the selected tab and handles the keyboard. The popover's owner
+/// refreshes on every open.
 struct PanelView: View {
     let service: DeviceService
     let presentation: PanelPresentation
+    @State private var tab: PanelTab = .devices
     @FocusState private var hasKeyboardFocus: Bool
 
     var body: some View {
-        PanelShell(summary: BatteryGauge.summary(deviceCount: service.devices.count),
+        PanelShell(summary: BatteryGauge.summary(deviceCount: service.devices.count), tab: $tab,
                    isRefreshing: service.isRefreshing, onRefresh: refresh) {
-            PanelContent(service: service)
+            switch tab {
+            case .devices:
+                PanelContent(service: service)
+            case .settings:
+                SettingsView()
+            }
         }
         .focusable()
         .focusEffectDisabled()
@@ -29,9 +50,10 @@ struct PanelView: View {
     }
 }
 
-/// Presentational frame of the panel: header, content, and a footer.
+/// Presentational frame of the panel: header, tab bar, the selected tab, and a footer.
 struct PanelShell<Content: View>: View {
     let summary: String
+    @Binding var tab: PanelTab
     let isRefreshing: Bool
     let onRefresh: () -> Void
     @ViewBuilder let content: Content
@@ -41,6 +63,9 @@ struct PanelShell<Content: View>: View {
             PanelHeader(summary: summary)
                 .padding(.horizontal, 16)
                 .padding(.top, 14)
+                .padding(.bottom, 10)
+            PanelTabBar(selection: $tab)
+                .padding(.horizontal, 16)
                 .padding(.bottom, 12)
             content
                 .padding(.horizontal, 16)
@@ -72,6 +97,20 @@ struct PanelHeader: View {
                 .tracking(0.8)
                 .foregroundStyle(Theme.dim)
                 .contentTransition(.numericText())
+        }
+    }
+}
+
+struct PanelTabBar: View {
+    @Binding var selection: PanelTab
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(PanelTab.allCases) { tab in
+                Chip(title: tab.title, isSelected: selection == tab) {
+                    selection = tab
+                }
+            }
         }
     }
 }
