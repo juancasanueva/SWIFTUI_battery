@@ -93,10 +93,10 @@ struct ReleasePipelineFilesTests {
 
 @Suite("Release script contract")
 struct ReleaseScriptContractTests {
-    @Test func buildsTheBatteryProductFromTheBatteryScheme() throws {
+    @Test func buildsThePeriBatteryProductFromTheBatteryScheme() throws {
         let script = try ReleasePipelineSources.text(ReleasePipelineSources.releaseScript)
         #expect(script.contains(#"readonly SCHEME="battery""#))
-        #expect(script.contains(#"readonly PRODUCT="battery""#))
+        #expect(script.contains(#"readonly PRODUCT="PeriBattery""#))
         #expect(script.contains(#"readonly PROJECT="battery.xcodeproj""#))
         #expect(script.contains("ARCHS=arm64"))
     }
@@ -106,9 +106,25 @@ struct ReleaseScriptContractTests {
         #expect(script.contains(#""com.juancasanueva.battery" "the delivered CFBundleIdentifier""#))
     }
 
-    @Test func packagesTheAssetAsBatteryVersionZip() throws {
+    @Test func packagesTheAssetAsPeriBatteryVersionZip() throws {
         let script = try ReleasePipelineSources.text(ReleasePipelineSources.releaseScript)
-        #expect(script.contains(#"ZIP="$BUILD/Battery-$VERSION.zip""#))
+        #expect(script.contains(#"ZIP="$BUILD/$PRODUCT-$VERSION.zip""#))
+    }
+
+    /// The app ships as `PeriBattery.app` (Homebrew's official `battery` cask already
+    /// installs `Battery.app`), while the Swift module stays `battery` so
+    /// `@testable import battery` keeps working.
+    @Test func theAppTargetShipsPeriBatteryWithTheBatteryModule() throws {
+        let project = try ReleasePipelineSources.text(ReleasePipelineSources.projectFile)
+        let names = try ReleasePipelineSources.captures(
+            #"INFOPLIST_FILE = "battery/Resources/Battery-Info.plist";[\s\S]*?PRODUCT_NAME = ([^;]+);"#,
+            in: project
+        )
+        #expect(names == ["PeriBattery", "PeriBattery"])
+        let modules = try ReleasePipelineSources.captures(#"PRODUCT_MODULE_NAME = ([^;]+);"#, in: project)
+        #expect(modules == ["battery", "battery"])
+        let hosts = try ReleasePipelineSources.captures(#"TEST_HOST = "([^"]+)";"#, in: project)
+        #expect(hosts == Array(repeating: "$(BUILT_PRODUCTS_DIR)/PeriBattery.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/PeriBattery", count: 2))
     }
 
     @Test func refusesABundleThatCarriesTheAppSandbox() throws {
@@ -156,9 +172,9 @@ struct AppcastScriptContractTests {
         #expect(emitted == [try #require(appTargets.first)])
     }
 
-    @Test func anEmptyChannelIsTitledBattery() throws {
+    @Test func anEmptyChannelIsTitledPeriBattery() throws {
         let script = try ReleasePipelineSources.text(ReleasePipelineSources.appcastScript)
-        #expect(script.contains("<title>Battery</title>"))
+        #expect(script.contains("<title>PeriBattery</title>"))
     }
 
     @Test func aPrereleaseTagFetchesNothingAndSucceeds() throws {
@@ -216,10 +232,11 @@ struct ReleaseWorkflowContractTests {
 
     @Test func publishesAndSignsTheAssetTheScriptPackages() throws {
         let workflow = try ReleasePipelineSources.text(ReleasePipelineSources.workflow)
-        #expect(workflow.contains(#"gh release create "$GITHUB_REF_NAME" "build/Battery-${VERSION}.zip""#))
+        #expect(workflow.contains(#"gh release create "$GITHUB_REF_NAME" "build/PeriBattery-${VERSION}.zip""#))
         #expect(workflow.contains("--verify-tag --generate-notes"))
-        #expect(workflow.contains("/releases/download/${{ github.ref_name }}/Battery-${{ env.VERSION }}.zip"))
-        #expect(workflow.contains("ZIP_PATH: build/Battery-${{ env.VERSION }}.zip"))
+        #expect(workflow.contains("/releases/download/${{ github.ref_name }}/PeriBattery-${{ env.VERSION }}.zip"))
+        #expect(workflow.contains("ZIP_PATH: build/PeriBattery-${{ env.VERSION }}.zip"))
+        #expect(workflow.contains(#"codesign -dvvv --entitlements :- "build/export/PeriBattery.app""#))
     }
 
     @Test func deletesTheEphemeralKeychainUnconditionally() throws {

@@ -1,6 +1,6 @@
 import Foundation
 
-/// Whether Battery may look for updates on its own. A missing key reads `false`: checking is network
+/// Whether PeriBattery may look for updates on its own. A missing key reads `false`: checking is network
 /// traffic, so it stays off until the user asks.
 nonisolated struct AutomaticUpdateChecks: @unchecked Sendable {
     static let key = "updates.automaticChecksEnabled"

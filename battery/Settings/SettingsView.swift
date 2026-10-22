@@ -21,7 +21,7 @@ struct SettingsView: View {
     private var launchNote: String? {
         if let error = launchAtLogin.errorMessage { return error }
         guard launchAtLogin.needsApproval else { return nil }
-        return "Allow Battery in System Settings › Login Items."
+        return "Allow PeriBattery in System Settings › Login Items."
     }
 
     /// `nil` without an updater (the unit-test host), which hides the card.
@@ -61,7 +61,7 @@ struct SettingsForm: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             SectionHeader("SETTINGS")
-            SettingCard(title: "Launch at login", description: "Start Battery when you log in to your Mac.",
+            SettingCard(title: "Launch at login", description: "Start PeriBattery when you log in to your Mac.",
                         isOn: $launchAtLogin) {
                 if let launchNote {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -88,7 +88,7 @@ struct UpdatesCard: View {
 
     var body: some View {
         SettingCard(title: "Automatically check for updates",
-                    description: "Battery looks for a new version once a day.",
+                    description: "PeriBattery looks for a new version once a day.",
                     isOn: updates.automaticChecks) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(updates.lastChecked)
@@ -107,7 +107,7 @@ struct UpdatesCard: View {
 #Preview {
     @Previewable @State var launchAtLogin = true
     @Previewable @State var automaticChecks = false
-    SettingsForm(launchAtLogin: $launchAtLogin, launchNote: "Allow Battery in System Settings › Login Items.",
+    SettingsForm(launchAtLogin: $launchAtLogin, launchNote: "Allow PeriBattery in System Settings › Login Items.",
                  onOpenLoginItems: {},
                  updates: UpdatesSettings(automaticChecks: $automaticChecks, lastChecked: "Never checked",
                                           canCheck: true, onCheck: {}))

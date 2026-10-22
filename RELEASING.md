@@ -1,9 +1,9 @@
-# Releasing Battery
+# Releasing PeriBattery
 
-How a version of Battery becomes a notarized download, a Sparkle update and a
+How a version of PeriBattery becomes a notarized download, a Sparkle update and a
 Homebrew cask, and what to do when a run fails. The pipeline is a port of the
 one matchday (`juancasanueva/SWIFTUI_matchday`) already ships through, with
-Battery's names, feed and bundle identifier.
+PeriBattery's names, feed and bundle identifier.
 
 ## 1. How a release happens
 
@@ -54,19 +54,19 @@ first release.
    `https://juancasanueva.github.io/SWIFTUI_battery/appcast.xml`, the feed in
    `battery/Resources/Battery-Info.plist` (`SUFeedURL`). Without the `v*` tag
    rule the deploy step fails at the end of an otherwise successful release.
-4. **The Sparkle key is shared.** Battery's `SUPublicEDKey`
+4. **The Sparkle key is shared.** PeriBattery's `SUPublicEDKey`
    (`jqReS/cOvK94pbRz/4DwMBTRMwh/0Nf5OJZ5SAfZDVs=`) is the same public key the
    author's other apps ship, so `SPARKLE_PRIVATE_KEY` is the same private key
    their release jobs use. Export it from the login Keychain with Sparkle
    2.9.6's `./bin/generate_keys -x sparkle-private.key` if you need it offline.
    Losing it severs the update channel of **every** app that shares it; the
    public key is not a secret.
-5. **The Homebrew cask (remaining).** `Casks/battery.rb` belongs in
-   `juancasanueva/tap` (`juancasanueva/homebrew-tap`), with a `battery` entry in
+5. **The Homebrew cask (remaining).** `Casks/peribattery.rb` belongs in
+   `juancasanueva/tap` (`juancasanueva/homebrew-tap`), with a `peribattery` entry in
    its `bump.yml` matrix and `ci.yml`. Push or merge that tap change before or
    right after the first release. The tap pulls new versions on a schedule from
    this repository's `releases/latest`; the release job never pushes to it.
-   After the first release, add `battery` to the tap CI's online audit and
+   After the first release, add `peribattery` to the tap CI's online audit and
    install/zap jobs and drop its `unreleased` flag in `bump.yml`.
 
 ## 3. Cutting a release
@@ -86,13 +86,13 @@ and each one merges into the feed the previous run deployed.
 
 ```sh
 git switch main && git pull
-git tag -a v1.0.0 -m "Battery 1.0.0"
+git tag -a v1.0.0 -m "PeriBattery 1.0.0"
 git push origin v1.0.0
 ```
 
 Then watch the run in the Actions tab. Stages, in order: private-repository gate,
 distinct-commit gate, Pin Xcode (26.6), keychain import, Archive, Export (gates
-version and `arm64`), Package (`Battery-<version>.zip`), Notarize, Staple and
+version and `arm64`), Package (`PeriBattery-<version>.zip`), Notarize, Staple and
 repackage, Verify (Gatekeeper, staple, signature, hardened runtime, Developer ID
 team, **no app-sandbox entitlement**, architecture, version, build, bundle name
 and identifier, no release files inside the bundle), Smoke (launch the delivered
@@ -108,17 +108,22 @@ What every delivery channel binds to:
 
 | Property | Value |
 |---|---|
-| Asset | `https://github.com/juancasanueva/SWIFTUI_battery/releases/download/v<version>/Battery-<version>.zip` |
-| Bundle | `battery.app`, `Contents/MacOS/battery`, identifier `com.juancasanueva.battery` |
+| Asset | `https://github.com/juancasanueva/SWIFTUI_battery/releases/download/v<version>/PeriBattery-<version>.zip` |
+| Bundle | `PeriBattery.app`, `Contents/MacOS/PeriBattery`, identifier `com.juancasanueva.battery` |
 | Signature | Developer ID Application, team `Z3S5JK8E38`, hardened runtime, no sandbox, notarized and stapled |
 | Floor | macOS 15.6 (`MINIMUM_SYSTEM_VERSION` in `scripts/appcast.sh` equals `MACOSX_DEPLOYMENT_TARGET`), Apple silicon only |
 | Feed | `https://juancasanueva.github.io/SWIFTUI_battery/appcast.xml`, republished on every stable tag |
 
-The bundle is `battery.app` because the target's `PRODUCT_NAME` is
-`$(TARGET_NAME)`; the asset name is capitalized independently. Renaming the
-product means changing `PRODUCT` in `scripts/release.sh`, the `Record signing
-evidence` path in the workflow, the pipeline tests and the cask's `app` stanza
-together.
+The bundle is `PeriBattery.app` because the app target sets `PRODUCT_NAME =
+PeriBattery` (and `CFBundleDisplayName` to match) while `PRODUCT_MODULE_NAME`
+stays `battery`; Homebrew's official `battery` cask already installs an
+unrelated `Battery.app`. The repository (`SWIFTUI_battery`), the target, scheme
+and bundle identifier keep the `battery` name. The asset is named after the
+product (`$PRODUCT-$VERSION.zip`). Renaming the product again means changing
+`PRODUCT_NAME`/`CFBundleDisplayName` and the test targets' `TEST_HOST` in the
+project, `PRODUCT` in `scripts/release.sh`, the asset paths and the `Record
+signing evidence` path in the workflow, the pipeline tests and the cask's `app`
+stanza together.
 
 ## 4. Local rehearsal
 
@@ -155,8 +160,8 @@ GITHUB_REF_NAME=v1.0.0 SPARKLE_TOOLS_DIR=/tmp/sparkle-tools scripts/appcast.sh t
 GITHUB_REF_NAME=v1.0.0 FEED_URL=https://juancasanueva.github.io/SWIFTUI_battery/appcast.xml \
 CURRENT_FEED_FILE=/tmp/current-appcast.xml scripts/appcast.sh fetch
 VERSION=1.0.0 BUILD_NUMBER=1 GITHUB_REF_NAME=v1.0.0 \
-ASSET_URL=https://github.com/juancasanueva/SWIFTUI_battery/releases/download/v1.0.0/Battery-1.0.0.zip \
-ZIP_PATH=build/Battery-1.0.0.zip CURRENT_FEED_FILE=/tmp/current-appcast.xml \
+ASSET_URL=https://github.com/juancasanueva/SWIFTUI_battery/releases/download/v1.0.0/PeriBattery-1.0.0.zip \
+ZIP_PATH=build/PeriBattery-1.0.0.zip CURRENT_FEED_FILE=/tmp/current-appcast.xml \
 SPARKLE_TOOLS_DIR=/tmp/sparkle-tools OUTPUT_DIR=/tmp/site \
 SPARKLE_PRIVATE_KEY="$(cat ~/offline/sparkle-private.key)" scripts/appcast.sh
 ```
@@ -224,5 +229,5 @@ release by publishing a higher version.
   already exists; see "After Publish".
 - **The run is green but the feed is stale.** Usually the Pages CDN; compare the
   feed's `last-modified`. A hyphenated tag skips the feed by design.
-- **`brew install --cask juancasanueva/tap/battery` says an app is already
-  there.** Use `brew install --cask --adopt juancasanueva/tap/battery`.
+- **`brew install --cask juancasanueva/tap/peribattery` says an app is already
+  there.** Use `brew install --cask --adopt juancasanueva/tap/peribattery`.

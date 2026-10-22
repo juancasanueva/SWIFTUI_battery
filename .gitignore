@@ -1,2 +1,4 @@
 .atl/
 xcuserdata/
+build/
+.DS_Store
