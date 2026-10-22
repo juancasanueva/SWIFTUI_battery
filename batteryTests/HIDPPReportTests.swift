@@ -79,3 +79,30 @@ struct HIDPPReportTests {
         #expect(request.match(report) == .noMatch)
     }
 }
+
+@Suite("HID++ 1.0 device connection notifications")
+struct HIDPPConnectionNotificationTests {
+    @Test func parsesLinkEstablished() {
+        let report: [UInt8] = [0x10, 0x02, 0x41, 0x04, 0x01, 0x6B, 0x40]
+        #expect(HIDPPConnectionNotification(report: report)
+                == HIDPPConnectionNotification(deviceIndex: 2, isLinkEstablished: true))
+    }
+
+    @Test func parsesLinkNotEstablished() {
+        let report: [UInt8] = [0x10, 0x01, 0x41, 0x44, 0x01, 0x6B, 0x40]
+        #expect(HIDPPConnectionNotification(report: report)
+                == HIDPPConnectionNotification(deviceIndex: 1, isLinkEstablished: false))
+    }
+
+    @Test(arguments: [
+        [0x10, 0x02, 0x40, 0x04, 0x01, 0x6B, 0x40], // device disconnection (unpaired), not 0x41
+        [0x11, 0x02, 0x41, 0x04, 0x01, 0x6B, 0x40], // long report: a HID++ 2.0 feature 0x41 call
+        [0x10, 0xFF, 0x41, 0x04, 0x01, 0x6B, 0x40], // receiver index, not a paired slot
+        [0x10, 0x07, 0x41, 0x04, 0x01, 0x6B, 0x40], // outside the paired slots 1...6
+        [0x10, 0x02, 0x41], // truncated
+        [0x10, 0x02, 0x8F, 0x41, 0x0B, 0x09, 0x00], // HID++ 1.0 error report
+    ] as [[UInt8]])
+    func ignoresOtherReports(report: [UInt8]) {
+        #expect(HIDPPConnectionNotification(report: report) == nil)
+    }
+}

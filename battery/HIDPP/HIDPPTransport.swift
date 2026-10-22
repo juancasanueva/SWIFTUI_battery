@@ -18,6 +18,8 @@ final class HIDPPTransport {
 
     /// Called after a receiver is attached or removed.
     var onReceiversChanged: (() -> Void)?
+    /// Called for every input report that does not answer the pending request (receiver and device notifications).
+    var onUnsolicitedReport: ((Receiver, [UInt8]) -> Void)?
     /// The first IOKit open failure, e.g. `kIOReturnNotPermitted` when access is denied.
     private(set) var openFailure: IOReturn?
 
@@ -137,16 +139,20 @@ final class HIDPPTransport {
             let head = report.prefix(8).map { String(format: "%02X", $0) }.joined(separator: " ")
             logger.notice("First input report from \(channel.receiver.name, privacy: .public): \(head, privacy: .public)")
         }
-        guard let pending = channel.pending else { return }
-        let match = pending.request.match(report)
-        switch match {
-        case .noMatch:
-            return
-        case let .response(payload):
-            channel.finish(pending, with: .success(payload))
-        case .error:
-            channel.finish(pending, with: .failure(HIDPPTransportError(match: match) ?? .timeout))
+        if let pending = channel.pending {
+            let match = pending.request.match(report)
+            switch match {
+            case .noMatch:
+                break
+            case let .response(payload):
+                channel.finish(pending, with: .success(payload))
+                return
+            case .error:
+                channel.finish(pending, with: .failure(HIDPPTransportError(match: match) ?? .timeout))
+                return
+            }
         }
+        onUnsolicitedReport?(channel.receiver, report)
     }
 
     // MARK: - Helpers
