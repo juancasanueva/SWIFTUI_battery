@@ -7,8 +7,9 @@ nonisolated enum ChargingState: Sendable, Equatable {
 nonisolated struct BatteryReading: Sendable, Equatable {
     static let percentRange: ClosedRange<Int> = 0...100
 
-    let percent: Int
-    /// True when the percentage is derived from a coarse level or a voltage curve.
+    /// Nil when the device is charging and does not report a level.
+    let percent: Int?
+    /// True when the percentage is derived from a coarse level, a voltage curve, or an earlier reading.
     let isApproximate: Bool
     let chargingState: ChargingState
 }
@@ -68,8 +69,11 @@ nonisolated enum BatteryStatus {
 
     static func parseStatus(_ payload: [UInt8]) -> BatteryReading? {
         guard payload.count >= 3 else { return nil }
-        return BatteryReading(percent: clampedPercent(payload[0]), isApproximate: false,
-                              chargingState: chargingState(code: payload[2]))
+        let state = chargingState(code: payload[2])
+        // While recharging the level byte reads 0, meaning "unknown"; a 0 while discharging can be a real empty battery.
+        let isLevelUnknown = payload[0] == 0 && (state == .charging || state == .slowCharging)
+        return BatteryReading(percent: isLevelUnknown ? nil : clampedPercent(payload[0]), isApproximate: false,
+                              chargingState: state)
     }
 
     private static func chargingState(code: UInt8) -> ChargingState {

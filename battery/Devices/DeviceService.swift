@@ -163,7 +163,8 @@ final class DeviceService {
                 """)
         }
 
-        let battery = await probe.readBattery()
+        let previous = devices.first { $0.receiver.id == receiver.id && $0.deviceIndex == index }?.battery
+        let battery = await probe.readBattery().fillingUnknownPercent(from: previous)
         if battery == .unavailable {
             // Stopped answering: whatever answers in this slot next is identified from scratch.
             slots.invalidate(key)
@@ -186,7 +187,8 @@ final class DeviceService {
         switch battery {
         case let .reading(reading, source):
             let feature = String(format: "0x%04X", source.rawValue)
-            return "\(reading.isApproximate ? "~" : "")\(reading.percent)% \(reading.chargingState) via \(feature)"
+            let percent = reading.percent.map { "\(reading.isApproximate ? "~" : "")\($0)%" } ?? "unknown level"
+            return "\(percent) \(reading.chargingState) via \(feature)"
         case .unavailable: return "unavailable"
         case .unsupported: return "no battery feature"
         }

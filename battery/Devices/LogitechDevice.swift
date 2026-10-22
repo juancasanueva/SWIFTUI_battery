@@ -25,6 +25,17 @@ nonisolated enum BatteryState: Sendable, Equatable {
     case unsupported
 }
 
+nonisolated extension BatteryState {
+    /// A charging reading without a level borrows the previous percent of the same device, marked approximate.
+    func fillingUnknownPercent(from previous: BatteryState?) -> BatteryState {
+        guard case let .reading(reading, source) = self, reading.percent == nil,
+              case let .reading(last, _)? = previous, let percent = last.percent
+        else { return self }
+        return .reading(BatteryReading(percent: percent, isApproximate: true, chargingState: reading.chargingState),
+                        source: source)
+    }
+}
+
 nonisolated struct DeviceIdentity: Sendable, Equatable {
     let name: String?
     let kind: DeviceKind

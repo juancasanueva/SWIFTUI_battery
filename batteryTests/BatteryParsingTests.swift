@@ -79,6 +79,17 @@ struct BatteryStatusTests {
         #expect(BatteryStatus.parseStatus([45, 30]) == nil)
     }
 
+    @Test(arguments: [(UInt8(1), ChargingState.charging), (2, .charging), (4, .slowCharging)])
+    func treatsZeroWhileChargingAsUnknownLevel(code: UInt8, state: ChargingState) {
+        let reading = BatteryStatus.parseStatus(payload(0, 0, code))
+        #expect(reading == BatteryReading(percent: nil, isApproximate: false, chargingState: state))
+    }
+
+    @Test(arguments: [UInt8(0), 3, 5])
+    func keepsZeroWhenNotCharging(code: UInt8) {
+        #expect(BatteryStatus.parseStatus(payload(0, 0, code))?.percent == 0)
+    }
+
     @Test func clampsOutOfRangePercent() {
         #expect(BatteryStatus.parseStatus(payload(200, 0, 0))?.percent == 100)
     }

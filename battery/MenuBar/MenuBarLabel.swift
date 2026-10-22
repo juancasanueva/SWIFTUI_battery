@@ -43,7 +43,7 @@ nonisolated enum MenuBarLabel {
         return segments.map { segment in
             let name = segment.symbol == keyboardSymbol ? Slot.keyboard.spokenName : Slot.pointer.spokenName
             let value = segment.text == unavailableText ? "unavailable" : segment.text
-            return "\(name) \(value)\(segment.isCharging ? " charging" : "")"
+            return [name, value, segment.isCharging ? "charging" : ""].filter { !$0.isEmpty }.joined(separator: " ")
         }.joined(separator: ", ")
     }
 
@@ -52,7 +52,7 @@ nonisolated enum MenuBarLabel {
         case let .reading(reading, _):
             let percent = percentText(for: battery)
             switch reading.chargingState {
-            case .charging, .slowCharging: return "\(percent) · Charging"
+            case .charging, .slowCharging: return percent.isEmpty ? "Charging" : "\(percent) · Charging"
             case .full: return "\(percent) · Full"
             case .error: return "\(percent) · Battery error"
             case .discharging, .unknown: return percent
@@ -72,9 +72,11 @@ nonisolated enum MenuBarLabel {
         }
     }
 
+    /// Empty when the device is charging without a known level: only the charging indicator is shown.
     private static func percentText(for battery: BatteryState) -> String {
         guard let reading = battery.reading else { return unavailableText }
-        return "\(reading.isApproximate ? "~" : "")\(reading.percent)%"
+        guard let percent = reading.percent else { return battery.isCharging ? "" : unavailableText }
+        return "\(reading.isApproximate ? "~" : "")\(percent)%"
     }
 }
 
