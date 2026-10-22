@@ -26,6 +26,17 @@ nonisolated struct InterfaceClassification: Sendable, Equatable {
     /// False when the interface did not answer; the result is used once and the interface asked again next time.
     let isDefinitive: Bool
 
+    /// Consecutive unanswered checks after which an interface is probed as a receiver anyway, so
+    /// a receiver that stays silent at 0xFF still lists its devices.
+    static let maxUnansweredChecks = 2
+
+    /// The kind to probe this refresh: a definitive answer as is; silence skips the interface
+    /// until it has stayed silent `maxUnansweredChecks` times in a row.
+    static func resolvedKind(_ classification: InterfaceClassification, unansweredChecks: Int) -> InterfaceKind {
+        guard !classification.isDefinitive else { return classification.kind }
+        return unansweredChecks >= maxUnansweredChecks ? .receiver : .unknown
+    }
+
     /// Root getFeature(0x0005) at the direct device index.
     static let probeRequest = RootFeature.getFeatureRequest(deviceIndex: HIDPP.directDeviceIndex, feature: .deviceNameType)
 

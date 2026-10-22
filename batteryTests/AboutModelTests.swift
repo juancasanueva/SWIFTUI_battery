@@ -28,7 +28,7 @@ struct AboutModelTests {
     @Test func listsTheRowsInOrder() {
         let rows = AboutModel.info(bundleInfo: [:]).rows
         #expect(rows.map(\.label) == ["Devices", "Protocol", "License", "Source"])
-        #expect(rows[0].value == "Logitech keyboards and mice on Unifying and Bolt receivers, or by USB cable")
+        #expect(rows[0].value == "Logitech keyboards and mice on Unifying, Bolt and Lightspeed receivers, or by USB cable")
         #expect(rows[1].value == "Logitech HID++ 2.0")
         #expect(rows[2].value == "MIT")
         #expect(rows[0].url == nil)

@@ -1,7 +1,7 @@
 # PeriBattery
 
 A macOS menu bar app that shows the battery level of Logitech keyboards and
-mice connected through a Unifying or Bolt receiver.
+mice connected through a Unifying, Bolt or Lightspeed receiver.
 
 PeriBattery lives only in the menu bar (no Dock icon, no main window). It talks to
 the devices directly over HID++ through their USB receivers, so it needs
@@ -21,7 +21,7 @@ scheme and bundle identifier (`com.juancasanueva.battery`) keep the original
 - **Panel**: click the icon for a popover with a card per device (name, level,
   charging state, gauge and the receiver it is paired to), when the readings
   were last updated, a refresh button (`⌘R`) and Quit (`⌘Q`). `Esc` closes it.
-- **Receivers**: Logitech Unifying and Bolt receivers, several at once. Devices
+- **Receivers**: Logitech Unifying, Bolt and Lightspeed receivers, several at once. Devices
   are rediscovered when a receiver is plugged in or a device connects, and
   re-read every five minutes and on every panel open.
 - **Settings tab** in the panel: launch at login and updates.
@@ -85,7 +85,7 @@ General › Login Items, where PeriBattery must be allowed.
 ## Tested hardware
 
 - Logitech MX Keys, through a Unifying receiver.
-- Logitech PRO X SUPERLIGHT 2 SE, through a Bolt receiver.
+- Logitech PRO X SUPERLIGHT 2 SE, through its Lightspeed receiver and by USB cable.
 
 Other HID++ 2.0 devices that report battery through UnifiedBattery (`0x1004`),
 BatteryStatus (`0x1000`) or BatteryVoltage (`0x1001`) should work, but have not

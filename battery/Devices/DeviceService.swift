@@ -39,6 +39,8 @@ final class DeviceService {
     @ObservationIgnored private var slots = SlotCache()
     /// Receiver or wired device, per interface; a re-matched interface gets a new ID and is classified again.
     @ObservationIgnored private var interfaceKinds: [UInt64: InterfaceKind] = [:]
+    /// Consecutive refreshes in which an interface left the 0xFF probe unanswered.
+    @ObservationIgnored private var unansweredChecksByInterface: [UInt64: Int] = [:]
     @ObservationIgnored private var refreshAgain = false
     @ObservationIgnored private var isStarted = false
     @ObservationIgnored private var periodicTask: Task<Void, Never>?
@@ -83,6 +85,7 @@ final class DeviceService {
         let attached = Set(receivers.map(\.id))
         slots.retain(receivers: attached)
         interfaceKinds = interfaceKinds.filter { attached.contains($0.key) }
+        unansweredChecksByInterface = unansweredChecksByInterface.filter { attached.contains($0.key) }
         allDevices = allDevices.attached(to: attached)
         updateAccess()
         scheduleRefresh()
@@ -134,8 +137,15 @@ final class DeviceService {
     }
 
     /// Asks index 0xFF once per interface: a wired device answers it and is probed there only, never on slots 1...6.
+    /// Known receivers skip the question; an interface that stays silent is probed as a receiver after
+    /// `InterfaceClassification.maxUnansweredChecks` refreshes.
     private func interfaceKind(of receiver: Receiver) async -> InterfaceKind {
         if let known = interfaceKinds[receiver.id] { return known }
+        if Receiver.isKnownReceiver(productID: receiver.productID) {
+            interfaceKinds[receiver.id] = .receiver
+            logger.notice("Interface \(receiver.name, privacy: .public) is a known receiver")
+            return .receiver
+        }
         let result: Result<[UInt8], any Error>
         do {
             result = .success(try await transport.send(InterfaceClassification.probeRequest, to: receiver))
@@ -143,15 +153,28 @@ final class DeviceService {
             result = .failure(error)
         }
         let classification = InterfaceClassification.classify(result)
-        if classification.isDefinitive { interfaceKinds[receiver.id] = classification.kind }
-        let kindName = switch classification.kind {
+        let unansweredChecks: Int
+        if classification.isDefinitive {
+            interfaceKinds[receiver.id] = classification.kind
+            unansweredChecksByInterface[receiver.id] = nil
+            unansweredChecks = 0
+        } else {
+            unansweredChecks = (unansweredChecksByInterface[receiver.id] ?? 0) + 1
+            unansweredChecksByInterface[receiver.id] = unansweredChecks
+        }
+        let kind = InterfaceClassification.resolvedKind(classification, unansweredChecks: unansweredChecks)
+        let kindName = switch kind {
         case .directDevice: "direct device"
         case .receiver: "receiver"
         case .unknown: "unknown"
         }
-        let note = classification.isDefinitive ? "" : " (no answer, not probed; will ask again)"
+        let note = switch (classification.isDefinitive, kind) {
+        case (true, _): ""
+        case (false, .unknown): " (no answer \(unansweredChecks)x, not probed; will ask again)"
+        case (false, _): " (no answer \(unansweredChecks)x, probing slots anyway)"
+        }
         logger.notice("Interface \(receiver.name, privacy: .public) classified as \(kindName, privacy: .public)\(note, privacy: .public)")
-        return classification.kind
+        return kind
     }
 
     private func readDevice(_ index: UInt8, on receiver: Receiver, kind: InterfaceKind) async -> LogitechDevice? {
