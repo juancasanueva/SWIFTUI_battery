@@ -53,14 +53,40 @@ nonisolated struct DeviceIdentity: Sendable, Equatable {
     }
 }
 
+/// How a device reaches the Mac.
+nonisolated enum DeviceConnection: Sendable, Equatable {
+    /// Paired to a receiver slot.
+    case receiver
+    /// Plugged in by cable; its HID++ interface is the device itself.
+    case usb
+}
+
 nonisolated struct LogitechDevice: Sendable, Equatable, Identifiable {
+    /// The HID++ interface the device answers on: its receiver, or the device itself when wired.
     let receiver: Receiver
     let deviceIndex: UInt8
     let name: String
     let kind: DeviceKind
     let battery: BatteryState
+    var connection: DeviceConnection = .receiver
 
     var id: String { "\(receiver.id)-\(deviceIndex)" }
+
+    /// Shown under the device name.
+    var connectionName: String {
+        switch connection {
+        case .receiver: receiver.name
+        case .usb: "USB"
+        }
+    }
+
+    /// Hover help for the card.
+    var connectionDetail: String {
+        switch connection {
+        case .receiver: "\(receiver.name), slot \(deviceIndex)"
+        case .usb: "Connected by USB cable"
+        }
+    }
 }
 
 nonisolated extension Array where Element == LogitechDevice {

@@ -9,6 +9,8 @@ nonisolated enum HIDPP {
     /// Nonzero so our responses can be told apart from device notifications.
     static let softwareID: UInt8 = 0x0B
     static let receiverIndex: UInt8 = 0xFF
+    /// A device attached by USB cable answers on this index (it also answers on any other).
+    static let directDeviceIndex: UInt8 = 0xFF
     static let pairedDeviceIndices: ClosedRange<UInt8> = 1...6
 
     static let hidpp20ErrorMarker: UInt8 = 0xFF
