@@ -26,8 +26,8 @@ macOS does not expose battery levels for devices paired to Logitech receivers. T
 ## Tasks
 - [x] T1 App shell: MenuBarExtra, LSUIElement, remove SwiftData template, sandbox USB entitlement. Route: delegated (writer trigger: 2+ non-trivial files).
 - [x] T2 HID++ protocol core (pure, tested): report building, response/error parsing, feature lookup, battery parsers, voltage mapping. Route: delegated.
-- [ ] T3 IOKit transport + device service: IOHIDManager for Logitech `0xFF00` interfaces, request/response with timeout, device enumeration, type/name, battery query. Route: delegated.
-- [ ] T4 Menu bar UI + refresh: label formatting (tested), device list, refresh timer, hot-plug, Refresh/Quit. Route: delegated.
+- [ ] T3 IOKit transport + device service: IOHIDManager for Logitech `0xFF00` interfaces, request/response with timeout, device enumeration, type/name, battery query. Route: delegated. Implemented and unit-tested; real-hardware check pending (receivers were not attached).
+- [ ] T4 Menu bar UI + refresh: label formatting (tested), device list, refresh timer, hot-plug, Refresh/Quit. Route: delegated. Implemented and unit-tested; real-hardware check pending.
 
 ## Acceptance criteria
 - App appears only in the menu bar and shows real keyboard and mouse battery percentages from the attached receivers.
@@ -51,5 +51,11 @@ macOS does not expose battery levels for devices paired to Logitech receivers. T
 - RDD slice 1 (`c8d4be8..545465a`): risk medium, review due (`slice_budget_reached`), consent granted, reliability lens APPROVED and acknowledged (lineage `review-60d45d04954453b5`). Reviewed boundary advances to `545465a`.
 - Advisory (non-blocking) findings, folded into T3: clamp 0x1000/0x1004 percent to 0...100 (`R3-percent-unclamped`), treat implausible 0x1001 voltage as unknown (`R3-zero-voltage`), test short-vs-long report matching (`R3-short-long-report-untested`).
 
+- Branch: `feat/logitech-battery-menubar-ui` (slice 2).
+- Step 0 `88b211a` fix: harden battery parsers against out-of-range readings. Percent from 0x1000/0x1004 clamped to 0...100; 0x1001 voltage outside 3000...4500 mV returns nil. RED: 7 failing cases (2 clamp, 5 implausible voltage); the 3 new report-matching tests passed immediately (characterization: `match` already rejected them). GREEN: `-only-testing:batteryTests test` → TEST SUCCEEDED, 98 cases passed.
+- T3 `01836af` feat: read Logitech device batteries over HID++. `HIDPPTransport` (IOHIDManager, VID 0x046D + PrimaryUsagePage 0xFF00, main run loop, per-receiver input callback with 64-byte buffer, `IOHIDDeviceSetReport` output 0x11 with 20 bytes, one request in flight per receiver, 1 s timeout, exactly-once continuation, removal fails pending work), `HIDPPTransportError`, `HIDPPInputReport.normalize` (prepends a missing report ID), `DeviceProbe` (pure over a `send` closure: 0x1004 → 0x1000 → 0x1001, cached feature indices, offline errors not cached), `DeviceService` (`@Observable`). RED: test target failed to compile (`cannot find 'HIDPPTransportError' in scope`). GREEN: TEST SUCCEEDED, 129 cases passed.
+- T4 (commit with this doc update) feat: show keyboard and mouse battery in the menu bar. `MenuBarLabel` (pure: keyboard/mouse segments, `—`, `~`, charging flag, row status, kind symbols), `BatteryMenuBarLabel` (one `Text` with inline SF Symbols), `BatteryMenuContent` (permission/failed row, device rows, Refresh, Quit). Refresh on launch, on hot-plug (500 ms debounce), and every 5 minutes; overlapping requests coalesce into one more pass. RED: compile failure (`cannot find 'MenuBarLabel' in scope`). GREEN: TEST SUCCEEDED, 150 cases passed. `xcodebuild build` → BUILD SUCCEEDED.
+- Hardware run (2026-10-22): the app launched; logs show `IOHIDManager opened` (no permission error) and `Refreshing 0 receiver(s)`. The receivers were not attached at the time: `hidutil list` showed no 0x046D service, and the USB tree showed only hubs and an SSD. Receiver opening, the report-ID byte layout, `SetReport` acceptance, and the real battery readings are NOT verified yet.
+
 ## Next step
-T3 (IOKit transport + device service).
+Plug in the Unifying and Bolt receivers, launch the app, and run `log show --last 2m --predicate 'subsystem == "com.juancasanueva.battery"' --style compact`. Confirm "Receiver found" for both, check the "First input report" bytes (byte 0 should be 0x10/0x11), and read the keyboard and mouse battery lines. Then check off T3/T4 and run the RDD assessment for slice 2.

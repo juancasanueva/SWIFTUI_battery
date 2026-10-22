@@ -27,11 +27,17 @@ final class DeviceService {
     private(set) var isRefreshing = false
     private(set) var lastRefreshed: Date?
 
+    static let refreshInterval: Duration = .seconds(5 * 60)
+    /// Receivers attach one interface at a time; wait for the burst to settle before probing.
+    static let hotPlugDebounce: Duration = .milliseconds(500)
+
     @ObservationIgnored private let transport = HIDPPTransport()
     @ObservationIgnored private let logger = Logger(subsystem: "com.juancasanueva.battery", category: "devices")
     @ObservationIgnored private var known: [DeviceKey: KnownDevice] = [:]
     @ObservationIgnored private var refreshAgain = false
     @ObservationIgnored private var isStarted = false
+    @ObservationIgnored private var periodicTask: Task<Void, Never>?
+    @ObservationIgnored private var hotPlugTask: Task<Void, Never>?
 
     func start() {
         guard !isStarted else { return }
@@ -40,6 +46,13 @@ final class DeviceService {
         transport.start()
         updateAccess()
         Task { await refresh() }
+        periodicTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: Self.refreshInterval)
+                guard !Task.isCancelled, let self else { return }
+                await self.refresh()
+            }
+        }
     }
 
     /// Re-reads every device. A refresh requested while one is running runs once more afterwards instead of overlapping.
@@ -63,6 +76,13 @@ final class DeviceService {
         let attached = Set(receivers.map(\.id))
         known = known.filter { attached.contains($0.key.receiverID) }
         updateAccess()
+
+        hotPlugTask?.cancel()
+        hotPlugTask = Task { [weak self] in
+            try? await Task.sleep(for: Self.hotPlugDebounce)
+            guard !Task.isCancelled, let self else { return }
+            await self.refresh()
+        }
     }
 
     private func updateAccess() {
