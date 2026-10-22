@@ -6,6 +6,8 @@ nonisolated enum MenuBarLabel {
         let symbol: String
         let text: String
         let isCharging: Bool
+        /// Red at 10% or less, red and bold at 5% or less.
+        var emphasis: BatteryGauge.Emphasis = .normal
     }
 
     static let keyboardSymbol = "keyboard"
@@ -34,7 +36,8 @@ nonisolated enum MenuBarLabel {
         Slot.allCases.compactMap { slot in
             let candidates = devices.filter { Slot($0.kind) == slot }
             guard let device = candidates.first(where: { $0.battery.reading != nil }) ?? candidates.first else { return nil }
-            return Segment(symbol: slot.symbol, text: percentText(for: device.battery), isCharging: device.battery.isCharging)
+            return Segment(symbol: slot.symbol, text: percentText(for: device.battery), isCharging: device.battery.isCharging,
+                           emphasis: BatteryGauge.emphasis(for: device.battery))
         }
     }
 

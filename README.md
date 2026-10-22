@@ -98,6 +98,8 @@ General › Login Items, where PeriBattery must be allowed.
 
 - Logitech MX Keys, through a Unifying receiver.
 - Logitech PRO X SUPERLIGHT 2 SE, through its Lightspeed receiver and by USB cable.
+- Logitech PRO 2 LIGHTSPEED, through its Lightspeed receiver and by USB cable
+  (reported by a user on 1.0.2).
 
 Other HID++ 2.0 devices that report battery through UnifiedBattery (`0x1004`),
 BatteryStatus (`0x1000`) or BatteryVoltage (`0x1001`) should work, but have not

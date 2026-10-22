@@ -46,6 +46,9 @@ struct StatusItemContent: View, Equatable {
                             if !segment.text.isEmpty {
                                 Text(segment.text)
                                     .monospacedDigit()
+                                    .fontWeight(segment.emphasis == .critical ? .bold : nil)
+                                    // System red stays legible on light, dark and transparent menu bars.
+                                    .foregroundStyle(segment.emphasis == .normal ? AnyShapeStyle(.primary) : AnyShapeStyle(.red))
                                     .lineLimit(1)
                                     .fixedSize()
                             }
@@ -101,6 +104,14 @@ final class PassthroughHostingView: NSHostingView<StatusItemContent> {
     StatusItemContent(segments: [
         .init(symbol: MenuBarLabel.keyboardSymbol, text: "80%", isCharging: true),
         .init(symbol: MenuBarLabel.mouseSymbol, text: "55%", isCharging: false),
+    ])
+    .padding()
+}
+
+#Preview("Status item, low and critical") {
+    StatusItemContent(segments: [
+        .init(symbol: MenuBarLabel.keyboardSymbol, text: "9%", isCharging: false, emphasis: .low),
+        .init(symbol: MenuBarLabel.mouseSymbol, text: "4%", isCharging: false, emphasis: .critical),
     ])
     .padding()
 }

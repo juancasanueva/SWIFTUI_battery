@@ -90,3 +90,16 @@ struct MenuBarLabelTests {
         #expect(MenuBarLabel.symbol(for: kind) == symbol)
     }
 }
+
+@Suite("Menu bar label emphasis")
+struct MenuBarLabelEmphasisTests {
+    @Test func segmentsCarryTheLowBatteryEmphasis() {
+        let segments = MenuBarLabel.segments(for: [device(.keyboard, reading(8)),
+                                                   device(.mouse, reading(4, approximate: true), index: 2)])
+        #expect(segments.map(\.emphasis) == [.low, .critical])
+    }
+
+    @Test func aHealthyLevelIsNotEmphasized() {
+        #expect(MenuBarLabel.segments(for: [device(.keyboard, reading(55))]).map(\.emphasis) == [.normal])
+    }
+}
