@@ -2,6 +2,7 @@ import Foundation
 
 nonisolated enum HIDPPFeature: UInt16, Sendable, CaseIterable {
     case root = 0x0000
+    case deviceInformation = 0x0003
     case deviceNameType = 0x0005
     case batteryStatus = 0x1000
     case batteryVoltage = 0x1001
@@ -49,6 +50,21 @@ nonisolated enum DeviceKind: Sendable, Equatable {
         case 7: self = .receiver
         default: self = .unknown
         }
+    }
+}
+
+/// Feature 0x0003 Device Information.
+nonisolated enum DeviceInformationFeature {
+    /// getDeviceInfo: `[entityCount, unitId(4), transport(2), modelId(6), extendedModelId, capabilities]`.
+    static func deviceInfoRequest(deviceIndex: UInt8, featureIndex: UInt8) -> HIDPPRequest {
+        HIDPPRequest(deviceIndex: deviceIndex, featureIndex: featureIndex, function: 0)
+    }
+
+    /// The serial-like unit ID, the same over every connection of one device; nil when missing or blank.
+    static func parseUnitID(_ payload: [UInt8]) -> UInt32? {
+        guard payload.count >= 5 else { return nil }
+        let unitID = payload[1...4].reduce(UInt32(0)) { $0 << 8 | UInt32($1) }
+        return unitID == 0 || unitID == .max ? nil : unitID
     }
 }
 

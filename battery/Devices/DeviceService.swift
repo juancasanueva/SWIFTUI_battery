@@ -21,7 +21,10 @@ final class DeviceService {
         }
     }
 
-    private(set) var devices: [LogitechDevice] = []
+    /// Every interface and slot that answered, including a wired device's twin behind its receiver.
+    private(set) var allDevices: [LogitechDevice] = []
+    /// What the panel and menu bar show: each physical device once.
+    var devices: [LogitechDevice] { allDevices.mergingTwins() }
     private(set) var receivers: [Receiver] = []
     private(set) var access: AccessState = .ok
     private(set) var isRefreshing = false
@@ -34,6 +37,8 @@ final class DeviceService {
     @ObservationIgnored private let transport = HIDPPTransport()
     @ObservationIgnored private let logger = Logger(subsystem: "com.juancasanueva.battery", category: "devices")
     @ObservationIgnored private var slots = SlotCache()
+    /// Receiver or wired device, per interface; a re-matched interface gets a new ID and is classified again.
+    @ObservationIgnored private var interfaceKinds: [UInt64: InterfaceKind] = [:]
     @ObservationIgnored private var refreshAgain = false
     @ObservationIgnored private var isStarted = false
     @ObservationIgnored private var periodicTask: Task<Void, Never>?
@@ -68,7 +73,7 @@ final class DeviceService {
         repeat {
             refreshAgain = false
             let read = await readAllDevices()
-            devices = read.attached(to: Set(transport.receivers.map(\.id)))
+            allDevices = read.attached(to: Set(transport.receivers.map(\.id)))
         } while refreshAgain
         lastRefreshed = .now
     }
@@ -77,7 +82,8 @@ final class DeviceService {
         receivers = transport.receivers
         let attached = Set(receivers.map(\.id))
         slots.retain(receivers: attached)
-        devices = devices.attached(to: attached)
+        interfaceKinds = interfaceKinds.filter { attached.contains($0.key) }
+        allDevices = allDevices.attached(to: attached)
         updateAccess()
         scheduleRefresh()
     }
@@ -113,14 +119,33 @@ final class DeviceService {
         logger.notice("Refreshing \(receivers.count, privacy: .public) receiver(s)")
         var result: [LogitechDevice] = []
         for receiver in receivers {
-            for index in HIDPP.pairedDeviceIndices {
-                if let device = await readDevice(index, on: receiver) { result.append(device) }
+            let kind = await interfaceKind(of: receiver)
+            for index in kind.deviceIndices {
+                if let device = await readDevice(index, on: receiver, kind: kind) { result.append(device) }
             }
         }
         return result
     }
 
-    private func readDevice(_ index: UInt8, on receiver: Receiver) async -> LogitechDevice? {
+    /// Asks index 0xFF once per interface: a wired device answers it and is probed there only, never on slots 1...6.
+    private func interfaceKind(of receiver: Receiver) async -> InterfaceKind {
+        if let known = interfaceKinds[receiver.id] { return known }
+        let result: Result<[UInt8], any Error>
+        do {
+            result = .success(try await transport.send(InterfaceClassification.probeRequest, to: receiver))
+        } catch {
+            result = .failure(error)
+        }
+        let classification = InterfaceClassification.classify(result)
+        if classification.isDefinitive { interfaceKinds[receiver.id] = classification.kind }
+        let kindName = classification.kind == .directDevice ? "direct device" : "receiver"
+        let note = classification.isDefinitive ? "" : " (no answer, will ask again)"
+        logger.notice("Interface \(receiver.name, privacy: .public) classified as \(kindName, privacy: .public)\(note, privacy: .public)")
+        return classification.kind
+    }
+
+    private func readDevice(_ index: UInt8, on receiver: Receiver, kind: InterfaceKind) async -> LogitechDevice? {
+        let connection: DeviceConnection = kind == .directDevice ? .usb : .receiver
         let key = DeviceKey(receiverID: receiver.id, deviceIndex: index)
         let epoch = slots.epoch(key)
         let trusted = slots.trusted(key)
@@ -155,15 +180,16 @@ final class DeviceService {
                 }
                 // Seen before: list it as unavailable and identify it again once it answers.
                 return LogitechDevice(receiver: receiver, deviceIndex: index, name: last.displayName(deviceIndex: index),
-                                      kind: last.kind, battery: .unavailable)
+                                      kind: last.kind, battery: .unavailable, connection: connection, unitID: last.unitID)
             }
             logger.notice("""
                 Device discovered on \(receiver.name, privacy: .public) #\(index, privacy: .public): \
-                \(identity.displayName(deviceIndex: index), privacy: .public) (\(String(describing: identity.kind), privacy: .public))
+                \(identity.displayName(deviceIndex: index), privacy: .public) (\(String(describing: identity.kind), privacy: .public)), \
+                unit \(identity.unitID.map { String(format: "%08X", $0) } ?? "unknown", privacy: .public)
                 """)
         }
 
-        let previous = devices.first { $0.receiver.id == receiver.id && $0.deviceIndex == index }?.battery
+        let previous = allDevices.first { $0.receiver.id == receiver.id && $0.deviceIndex == index }?.battery
         let battery = await probe.readBattery().fillingUnknownPercent(from: previous)
         if battery == .unavailable {
             // Stopped answering: whatever answers in this slot next is identified from scratch.
@@ -173,7 +199,8 @@ final class DeviceService {
         }
         let name = identity.displayName(deviceIndex: index)
         logger.notice("Battery \(name, privacy: .public): \(Self.describe(battery), privacy: .public)")
-        return LogitechDevice(receiver: receiver, deviceIndex: index, name: name, kind: identity.kind, battery: battery)
+        return LogitechDevice(receiver: receiver, deviceIndex: index, name: name, kind: identity.kind, battery: battery,
+                              connection: connection, unitID: identity.unitID)
     }
 
     private static func describe(_ result: Result<DeviceIdentity, any Error>) -> String {

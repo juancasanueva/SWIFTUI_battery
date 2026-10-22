@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// One device: kind icon, name, receiver, status, and a battery bar colored by level.
+/// One device: kind icon, name, connection, status, and a battery bar colored by level.
 struct DeviceCard: View {
     let device: LogitechDevice
 
@@ -34,7 +34,7 @@ struct DeviceCard: View {
                         .contentTransition(.numericText())
                         .lineLimit(1)
                 }
-                Text(device.receiver.name)
+                Text(device.connectionName)
                     .font(Theme.font(.caption))
                     .foregroundStyle(Theme.dim)
                     .lineLimit(1)
@@ -48,7 +48,7 @@ struct DeviceCard: View {
         .onHover { isHovered = $0 }
         .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isHovered)
         .animation(reduceMotion ? nil : .smooth, value: device.battery)
-        .help("\(device.receiver.name), slot \(device.deviceIndex)")
+        .help(device.connectionDetail)
         .accessibilityElement(children: .combine)
     }
 

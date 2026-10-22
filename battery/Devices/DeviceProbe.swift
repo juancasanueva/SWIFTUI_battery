@@ -53,10 +53,10 @@ struct DeviceProbe {
         }
     }
 
-    /// Name and kind via 0x0005. Throws when the device cannot be reached.
+    /// Name and kind via 0x0005, unit ID via 0x0003. Throws when the device cannot be reached.
     mutating func readIdentity() async throws -> DeviceIdentity {
         guard let index = try await featureIndex(.deviceNameType) else {
-            return DeviceIdentity(name: nil, kind: .unknown)
+            return DeviceIdentity(name: nil, kind: .unknown, unitID: try await readUnitID())
         }
         let countPayload = try await send(DeviceNameFeature.countRequest(deviceIndex: deviceIndex, featureIndex: index))
         let length = DeviceNameFeature.parseNameLength(countPayload) ?? 0
@@ -70,7 +70,20 @@ struct DeviceProbe {
         let typePayload = try await send(DeviceNameFeature.typeRequest(deviceIndex: deviceIndex, featureIndex: index))
 
         let name = length > 0 ? DeviceNameFeature.assembleName(length: length, chunks: chunks) : nil
-        return DeviceIdentity(name: name, kind: DeviceNameFeature.parseDeviceKind(typePayload))
+        return DeviceIdentity(name: name, kind: DeviceNameFeature.parseDeviceKind(typePayload), unitID: try await readUnitID())
+    }
+
+    /// Optional: nil when 0x0003 is missing or its call fails; only an unreachable device throws.
+    private mutating func readUnitID() async throws -> UInt32? {
+        do {
+            guard let index = try await featureIndex(.deviceInformation) else { return nil }
+            let payload = try await send(DeviceInformationFeature.deviceInfoRequest(deviceIndex: deviceIndex, featureIndex: index))
+            return DeviceInformationFeature.parseUnitID(payload)
+        } catch let error as HIDPPTransportError where error.meansDeviceUnreachable {
+            throw error
+        } catch {
+            return nil
+        }
     }
 
     /// Tries each battery feature in `batteryFeatureOrder`; a failing or unparsable feature falls through to the next.
@@ -101,7 +114,7 @@ struct DeviceProbe {
             return BatteryStatus.parseStatus(try await send(BatteryStatus.statusRequest(deviceIndex: deviceIndex, featureIndex: index)))
         case .batteryVoltage:
             return BatteryVoltage.parseVoltage(try await send(BatteryVoltage.voltageRequest(deviceIndex: deviceIndex, featureIndex: index)))
-        case .root, .deviceNameType:
+        case .root, .deviceInformation, .deviceNameType:
             return nil
         }
     }

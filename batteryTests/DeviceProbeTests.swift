@@ -185,6 +185,41 @@ struct DeviceProbeIdentityTests {
         #expect(identity == DeviceIdentity(name: "MX Master 3S for Mac", kind: .mouse))
     }
 
+    @Test func readsTheUnitIDWhenDeviceInformationIsSupported() async throws {
+        let device = ScriptedDevice()
+        device.features = [.deviceNameType: 3, .deviceInformation: 2]
+        device.respond(feature: .deviceNameType, function: 0, with: .success(payload(0)))
+        device.respond(feature: .deviceNameType, function: 2, with: .success(payload(3)))
+        device.respond(feature: .deviceInformation, function: 0,
+                       with: .success(payload(0x03, 0xA1, 0xB2, 0xC3, 0xD4, 0x00, 0x0E)))
+        var probe = makeProbe(device)
+
+        let identity = try await probe.readIdentity()
+
+        #expect(identity == DeviceIdentity(name: nil, kind: .mouse, unitID: 0xA1B2_C3D4))
+    }
+
+    @Test func identityWithoutDeviceInformationHasNoUnitID() async throws {
+        let device = ScriptedDevice()
+        device.features = [.deviceNameType: 3]
+        device.respond(feature: .deviceNameType, function: 0, with: .success(payload(0)))
+        device.respond(feature: .deviceNameType, function: 2, with: .success(payload(3)))
+        var probe = makeProbe(device)
+
+        #expect(try await probe.readIdentity() == DeviceIdentity(name: nil, kind: .mouse))
+    }
+
+    @Test func aFailingDeviceInformationCallKeepsTheIdentity() async throws {
+        let device = ScriptedDevice()
+        device.features = [.deviceNameType: 3, .deviceInformation: 2]
+        device.respond(feature: .deviceNameType, function: 0, with: .success(payload(0)))
+        device.respond(feature: .deviceNameType, function: 2, with: .success(payload(0)))
+        device.respond(feature: .deviceInformation, function: 0, with: .failure(.featureError(code: 0x05)))
+        var probe = makeProbe(device)
+
+        #expect(try await probe.readIdentity() == DeviceIdentity(name: nil, kind: .keyboard))
+    }
+
     @Test func identityWithoutNameFeatureIsUnknown() async throws {
         let device = ScriptedDevice()
         var probe = makeProbe(device)
