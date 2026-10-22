@@ -32,7 +32,7 @@ nonisolated enum AboutModel {
 
     private static let rows = [
         AboutRow(label: "Devices",
-                 value: "Logitech keyboards and mice on Unifying and Bolt receivers, or by USB cable"),
+                 value: "Logitech keyboards and mice on Unifying, Bolt and Lightspeed receivers, or by USB cable"),
         AboutRow(label: "Protocol", value: "Logitech HID++ 2.0"),
         AboutRow(label: "License", value: "MIT",
                  url: URL(string: "https://github.com/juancasanueva/SWIFTUI_battery/blob/main/LICENSE.md")),

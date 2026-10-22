@@ -1,7 +1,7 @@
 import Testing
 @testable import battery
 
-private let receiver = Receiver(id: 1, productID: 0xC547, name: "Bolt Receiver")
+private let receiver = Receiver(id: 1, productID: 0xC547, name: "Lightspeed Receiver")
 
 private func device(_ kind: DeviceKind, _ battery: BatteryState, index: UInt8 = 1) -> LogitechDevice {
     LogitechDevice(receiver: receiver, deviceIndex: index, name: "Device", kind: kind, battery: battery)

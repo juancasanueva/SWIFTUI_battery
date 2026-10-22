@@ -24,8 +24,9 @@ struct PanelView: View {
     @FocusState private var hasKeyboardFocus: Bool
 
     var body: some View {
+        // About goes through the popover's owner, which closes the panel before the window appears.
         PanelShell(summary: BatteryGauge.summary(deviceCount: service.devices.count), tab: $tab,
-                   isRefreshing: service.isRefreshing, onRefresh: refresh) {
+                   isRefreshing: service.isRefreshing, onRefresh: refresh, onAbout: presentation.openAbout) {
             switch tab {
             case .devices:
                 PanelContent(service: service)
@@ -56,11 +57,12 @@ struct PanelShell<Content: View>: View {
     @Binding var tab: PanelTab
     let isRefreshing: Bool
     let onRefresh: () -> Void
+    let onAbout: () -> Void
     @ViewBuilder let content: Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            PanelHeader(summary: summary)
+            PanelHeader(summary: summary, onAbout: onAbout)
                 .padding(.horizontal, 16)
                 .padding(.top, 14)
                 .padding(.bottom, 10)
@@ -87,17 +89,43 @@ struct PanelShell<Content: View>: View {
 
 struct PanelHeader: View {
     let summary: String
+    let onAbout: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("PeriBattery")
-                .font(Theme.font(.display, weight: .bold))
-            Text(summary.uppercased())
-                .font(Theme.font(.caption, weight: .semibold))
-                .tracking(0.8)
-                .foregroundStyle(Theme.dim)
-                .contentTransition(.numericText())
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("PeriBattery")
+                    .font(Theme.font(.display, weight: .bold))
+                Text(summary.uppercased())
+                    .font(Theme.font(.caption, weight: .semibold))
+                    .tracking(0.8)
+                    .foregroundStyle(Theme.dim)
+                    .contentTransition(.numericText())
+            }
+            Spacer(minLength: 8)
+            AboutButton(action: onAbout)
         }
+    }
+}
+
+/// The "i" at the top right of the header that opens the About window.
+private struct AboutButton: View {
+    let action: () -> Void
+    @State private var isHovered = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "info.circle")
+                .font(.system(size: 15))
+                .foregroundStyle(isHovered ? Theme.foreground : Theme.dim)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .help("About PeriBattery")
+        .accessibilityLabel("About PeriBattery")
+        .onHover { isHovered = $0 }
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isHovered)
     }
 }
 

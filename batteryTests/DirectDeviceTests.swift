@@ -21,14 +21,26 @@ struct InterfaceClassificationTests {
         #expect(classification.kind == .directDevice)
     }
 
-    @Test(arguments: [HIDPPTransportError.deviceUnavailable(code: 0x01), .featureError(code: 0x02)])
-    func aProtocolErrorMeansAReceiver(error: HIDPPTransportError) {
-        #expect(InterfaceClassification.classify(.failure(error)) == InterfaceClassification(kind: .receiver, isDefinitive: true))
+    /// Receivers reject the 0xFF probe with a HID++ 1.0 error (`10 FF 8F 00 0B 01 00` on both).
+    @Test func aHIDPP10ErrorMeansAReceiver() {
+        let classification = InterfaceClassification.classify(.failure(HIDPPTransportError.deviceUnavailable(code: 0x01)))
+        #expect(classification == InterfaceClassification(kind: .receiver, isDefinitive: true))
     }
 
+    /// Only a HID++ 2.0 device can answer with a HID++ 2.0 error, such as busy.
+    @Test func aHIDPP20ErrorMeansADirectDevice() {
+        let classification = InterfaceClassification.classify(.failure(HIDPPTransportError.featureError(code: 0x08)))
+        #expect(classification == InterfaceClassification(kind: .directDevice, isDefinitive: true))
+    }
+
+    /// Guessing "receiver" here probed a busy wired device on slots 1...6 and listed it six times.
     @Test(arguments: [HIDPPTransportError.timeout, .receiverNotFound, .io(-536_870_212)])
-    func noAnswerKeepsTheReceiverProbeWithoutCachingIt(error: HIDPPTransportError) {
-        #expect(InterfaceClassification.classify(.failure(error)) == InterfaceClassification(kind: .receiver, isDefinitive: false))
+    func noAnswerLeavesTheInterfaceUnknownForThisRefresh(error: HIDPPTransportError) {
+        #expect(InterfaceClassification.classify(.failure(error)) == InterfaceClassification(kind: .unknown, isDefinitive: false))
+    }
+
+    @Test func anUnknownInterfaceIsNotProbed() {
+        #expect(InterfaceKind.unknown.deviceIndices.isEmpty)
     }
 
     @Test func aReceiverProbesEveryPairedSlot() {
@@ -69,5 +81,39 @@ struct DeviceConnectionTests {
 
     @Test func connectionNotificationsIgnoreTheDirectIndex() {
         #expect(HIDPPConnectionNotification(report: [0x10, 0xFF, 0x41, 0x10, 0x00, 0, 0]) == nil)
+    }
+}
+
+@Suite("Receiver fallback")
+struct ReceiverFallbackTests {
+    @Test(arguments: [0xC52B, 0xC532, 0xC548, 0xC539, 0xC53A, 0xC53F, 0xC547, 0xC54D, 0xC534])
+    func knownReceiversSkipTheProbe(productID: Int) {
+        #expect(Receiver.isKnownReceiver(productID: productID))
+    }
+
+    @Test(arguments: [0xC09B, 0xB023, 0x0000])
+    func otherInterfacesAreProbed(productID: Int) {
+        #expect(!Receiver.isKnownReceiver(productID: productID))
+    }
+
+    @Test func lightspeedAndBoltAreNamedApart() {
+        #expect(Receiver.displayName(productID: 0xC547, productString: nil) == "Lightspeed Receiver")
+        #expect(Receiver.displayName(productID: 0xC548, productString: nil) == "Bolt Receiver")
+    }
+
+    @Test func aDefinitiveAnswerIsUsedAsIs() {
+        let direct = InterfaceClassification(kind: .directDevice, isDefinitive: true)
+        #expect(InterfaceClassification.resolvedKind(direct, unansweredChecks: 5) == .directDevice)
+    }
+
+    @Test func oneUnansweredCheckSkipsTheInterface() {
+        let silent = InterfaceClassification(kind: .unknown, isDefinitive: false)
+        #expect(InterfaceClassification.resolvedKind(silent, unansweredChecks: 1) == .unknown)
+    }
+
+    /// A receiver that never answers at 0xFF must still have its slots probed.
+    @Test func repeatedSilenceFallsBackToTheReceiverProbe() {
+        let silent = InterfaceClassification(kind: .unknown, isDefinitive: false)
+        #expect(InterfaceClassification.resolvedKind(silent, unansweredChecks: InterfaceClassification.maxUnansweredChecks) == .receiver)
     }
 }

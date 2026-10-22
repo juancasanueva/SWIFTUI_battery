@@ -278,7 +278,8 @@ struct TransportHelperTests {
 
     @Test(arguments: [
         (0xC52B, String?.none, "Unifying Receiver"),
-        (0xC547, nil, "Bolt Receiver"),
+        // 0xC547 is a Lightspeed receiver (Solaar `base_usb.py`); Bolt is 0xC548 only.
+        (0xC547, nil, "Lightspeed Receiver"),
         (0xC548, "USB Receiver", "Bolt Receiver"),
         (0xC534, "Nano Receiver", "Nano Receiver"),
         (0xC999, nil, "Logitech Receiver"),

@@ -7,10 +7,24 @@ nonisolated struct Receiver: Sendable, Hashable, Identifiable {
     let productID: Int
     let name: String
 
+    /// Receiver product IDs, as listed by Solaar (`lib/logitech_receiver/base_usb.py`). Their devices
+    /// answer on slots 1...6, so they skip the 0xFF probe that tells wired devices apart.
+    private static let unifyingProductIDs: Set<Int> = [0xC52B, 0xC532]
+    private static let lightspeedProductIDs: Set<Int> = [0xC539, 0xC53A, 0xC53D, 0xC53F, 0xC541, 0xC545, 0xC547, 0xC54D]
+    private static let knownReceiverProductIDs: Set<Int> = unifyingProductIDs
+        .union(lightspeedProductIDs)
+        .union([0xC548]) // Bolt
+        .union([0xC518, 0xC51A, 0xC51B, 0xC521, 0xC525, 0xC526, 0xC52E, 0xC52F, 0xC531, 0xC534, 0xC535, 0xC537]) // Nano
+
+    static func isKnownReceiver(productID: Int) -> Bool {
+        knownReceiverProductIDs.contains(productID)
+    }
+
     static func displayName(productID: Int, productString: String?) -> String {
         switch productID {
-        case 0xC52B, 0xC532: "Unifying Receiver"
-        case 0xC547, 0xC548: "Bolt Receiver"
+        case _ where unifyingProductIDs.contains(productID): "Unifying Receiver"
+        case 0xC548: "Bolt Receiver"
+        case _ where lightspeedProductIDs.contains(productID): "Lightspeed Receiver"
         default: productString.map { $0.trimmingCharacters(in: .whitespaces) }.flatMap { $0.isEmpty ? nil : $0 }
             ?? "Logitech Receiver"
         }
