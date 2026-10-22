@@ -1,7 +1,15 @@
+<p align="center">
+  <img src="docs/icon.png" width="128" height="128" alt="PeriBattery app icon">
+</p>
+
 # PeriBattery
 
 A macOS menu bar app that shows the battery level of Logitech keyboards and
 mice connected through a Unifying, Bolt or Lightspeed receiver.
+
+<p align="center">
+  <img src="docs/screenshot.png" width="344" alt="PeriBattery in the menu bar with its panel open, showing an MX Keys keyboard at 100% and a PRO X SUPERLIGHT 2 SE mouse at 93%">
+</p>
 
 PeriBattery lives only in the menu bar (no Dock icon, no main window). It talks to
 the devices directly over HID++ through their USB receivers, so it needs
@@ -14,16 +22,20 @@ scheme and bundle identifier (`com.juancasanueva.battery`) keep the original
 
 ## Features
 
-- **Menu bar icons**: one keyboard and one mouse symbol with the percentage
-  next to each, and a charging indicator while a device charges. When the icon
-  image cannot be drawn, a plain-text label (`KB 80% ⚡︎  M 55%`) is shown
-  instead.
+- **Menu bar icons**: a keyboard and a mouse symbol, each with its percentage
+  and a charging indicator while the device charges, separated by a hairline on
+  a rounded card.
 - **Panel**: click the icon for a popover with a card per device (name, level,
-  charging state, gauge and the receiver it is paired to), when the readings
-  were last updated, a refresh button (`⌘R`) and Quit (`⌘Q`). `Esc` closes it.
+  charging state, gauge and how it is connected), when the readings were last
+  updated, a refresh button (`⌘R`) on the left and Quit (`⌘Q`) on the right.
+  `Esc` closes it; the ⓘ button opens the About window.
+- **Right-click menu** on the icon: About PeriBattery, Check for Updates… and
+  Quit.
 - **Receivers**: Logitech Unifying, Bolt and Lightspeed receivers, several at once. Devices
   are rediscovered when a receiver is plugged in or a device connects, and
   re-read every five minutes and on every panel open.
+- **USB cable**: a device plugged in to charge is read over the cable and shown
+  once, merged with its receiver entry.
 - **Settings tab** in the panel: launch at login and updates.
 
 ## Install
