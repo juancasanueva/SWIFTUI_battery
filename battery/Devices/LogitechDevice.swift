@@ -51,3 +51,10 @@ nonisolated struct LogitechDevice: Sendable, Equatable, Identifiable {
 
     var id: String { "\(receiver.id)-\(deviceIndex)" }
 }
+
+nonisolated extension Array where Element == LogitechDevice {
+    /// Drops devices whose receiver is no longer attached, so a re-enumerated receiver never lists its devices twice.
+    func attached(to receiverIDs: Set<UInt64>) -> [LogitechDevice] {
+        filter { receiverIDs.contains($0.receiver.id) }
+    }
+}

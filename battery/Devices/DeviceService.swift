@@ -67,7 +67,8 @@ final class DeviceService {
 
         repeat {
             refreshAgain = false
-            devices = await readAllDevices()
+            let read = await readAllDevices()
+            devices = read.attached(to: Set(transport.receivers.map(\.id)))
         } while refreshAgain
         lastRefreshed = .now
     }
@@ -76,6 +77,7 @@ final class DeviceService {
         receivers = transport.receivers
         let attached = Set(receivers.map(\.id))
         slots.retain(receivers: attached)
+        devices = devices.attached(to: attached)
         updateAccess()
         scheduleRefresh()
     }
