@@ -1,11 +1,16 @@
-# Battery
+# PeriBattery
 
 A macOS menu bar app that shows the battery level of Logitech keyboards and
 mice connected through a Unifying or Bolt receiver.
 
-Battery lives only in the menu bar (no Dock icon, no main window). It talks to
+PeriBattery lives only in the menu bar (no Dock icon, no main window). It talks to
 the devices directly over HID++ through their USB receivers, so it needs
 neither Logitech Options+ nor any Logitech software running.
+
+The app ships as `PeriBattery.app` because Homebrew's official `battery` cask
+already installs an unrelated `Battery.app`. The repository, Xcode project,
+scheme and bundle identifier (`com.juancasanueva.battery`) keep the original
+`battery` name, so the source still lives in `SWIFTUI_battery`.
 
 ## Features
 
@@ -30,39 +35,38 @@ With [Homebrew](https://brew.sh):
 ```sh
 brew trust juancasanueva/tap   # Homebrew 6.0.22 or later only
 brew tap juancasanueva/tap
-brew install --cask juancasanueva/tap/battery
+brew install --cask juancasanueva/tap/peribattery
 ```
 
 Homebrew 6.0.22 and later refuse to tap a third-party tap that carries a cask
 until it is trusted, which is what the first line does; skip it on older
-Homebrew. Always use the fully qualified `juancasanueva/tap/battery`: a bare
-`battery` may resolve to an unrelated cask of the same name.
+Homebrew.
 
-**Already have `battery.app` in `/Applications`?** Homebrew refuses to
+**Already have `PeriBattery.app` in `/Applications`?** Homebrew refuses to
 overwrite an app it did not place. Let it adopt the existing copy instead:
 
 ```sh
-brew install --cask --adopt juancasanueva/tap/battery
+brew install --cask --adopt juancasanueva/tap/peribattery
 ```
 
-Or download the latest `Battery-<version>.zip` from [Releases](../../releases),
-unzip it, and drag `battery.app` to `/Applications`. The build is notarized and
+Or download the latest `PeriBattery-<version>.zip` from [Releases](../../releases),
+unzip it, and drag `PeriBattery.app` to `/Applications`. The build is notarized and
 stapled, so the first launch is an ordinary "Open" confirmation.
 
-To update, `brew upgrade --cask juancasanueva/tap/battery` (or let the app
+To update, `brew upgrade --cask juancasanueva/tap/peribattery` (or let the app
 update itself, below). To remove it,
-`brew uninstall --cask --zap juancasanueva/tap/battery` also deletes Battery's
+`brew uninstall --cask --zap juancasanueva/tap/peribattery` also deletes PeriBattery's
 preferences and caches.
 
 ### Input Monitoring
 
 macOS treats reading a keyboard receiver as input monitoring. If the panel
-shows **Permission needed**, click **Open Settings…** and allow Battery under
+shows **Permission needed**, click **Open Settings…** and allow PeriBattery under
 System Settings › Privacy & Security › Input Monitoring, then reopen the panel.
 
 ## Updates
 
-Battery updates itself with [Sparkle](https://sparkle-project.org) from an
+PeriBattery updates itself with [Sparkle](https://sparkle-project.org) from an
 EdDSA-signed appcast published with each release. Open the panel's
 **Settings** tab and click **Check for Updates…**, or turn on **Automatically
 check for updates** (once a day). Automatic checking is off until you turn it
@@ -76,7 +80,7 @@ pipeline, the one-time setup and troubleshooting.
 Turn on **Launch at login** in the panel's **Settings** tab. It registers the
 app with macOS as a login item (`SMAppService`). If macOS asks for approval,
 the card says so and **Open Login Items** takes you to System Settings ›
-General › Login Items, where Battery must be allowed.
+General › Login Items, where PeriBattery must be allowed.
 
 ## Tested hardware
 
@@ -101,7 +105,7 @@ xcodebuild -project battery.xcodeproj -scheme battery -destination 'platform=mac
 ```
 
 Or open `battery.xcodeproj` in Xcode and run the `battery` scheme; it builds
-`battery.app`. The only package dependency is Sparkle 2.9.6 (Swift Package
+`PeriBattery.app` (the Swift module stays `battery`). The only package dependency is Sparkle 2.9.6 (Swift Package
 Manager).
 
 The app is **not sandboxed**, so Sparkle can replace it in place, and it uses
@@ -128,4 +132,4 @@ updates and the release pipeline's files.
 
 ## License
 
-Battery is released under the [MIT License](LICENSE.md).
+PeriBattery is released under the [MIT License](LICENSE.md).
