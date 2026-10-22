@@ -18,7 +18,7 @@ Add a Settings view with a "Launch at login" switch, Sparkle "Check for Updates"
 
 ## Tasks
 - [x] T1 Drop the sandbox (build settings), confirm receivers still read. Route: delegated (writer for T1-T3; pbxproj + 2+ non-trivial Swift files).
-- [ ] T2 Settings tab in the panel + Launch at login (`LaunchAtLogin`, `SMAppService` adapter, tests). Route: delegated.
+- [x] T2 Settings tab in the panel + Launch at login (`LaunchAtLogin`, `SMAppService` adapter, tests). Route: delegated.
 - [ ] T3 Sparkle updates (SPM 2.9.6, adapter, protocol, policy, automatic checks, Info.plist keys, Updates card, "Check for Updates…" closes the panel first, tests). Route: delegated.
 - [ ] T4 Release pipeline + docs (`release.yml`, `release.sh`, `appcast.sh`, `ExportOptions.plist`, `RELEASING.md`, README install section, pipeline tests). Route: delegated.
 - [ ] T5 Homebrew cask `battery.rb` + bump/ci matrix entries in `juancasanueva/homebrew-tap` (separate repo; needs explicit authorization before writing/pushing there). Route: delegated.
@@ -36,6 +36,7 @@ Add a Settings view with a "Launch at login" switch, Sparkle "Check for Updates"
 ## Progress / evidence
 - Branch: `feat/settings-updates-brew` (from `main` `e57ee3c`).
 - T1: `ENABLE_APP_SANDBOX = NO` (Debug+Release), removed `ENABLE_RESOURCE_ACCESS_USB` and `ENABLE_USER_SELECTED_FILES` (sandbox-only, matchday has neither); `ENABLE_HARDENED_RUNTIME = YES` unchanged. Evidence: build succeeded; `codesign -d --entitlements -` shows only `get-task-allow`; launched app logged `IOHIDManager opened`, both receivers found (Unifying 0xc52b, Bolt 0xc547), MX Keys and PRO X SUPERLIGHT 2 SE battery lines, no open errors.
+- T2: `PanelTab` (Devices, Settings) with a `Chip` tab bar; `SettingsView`/`SettingsForm` with a "Launch at login" `SettingCard`, approval note + "Open Login Items", error text; `LaunchAtLogin` + `LoginItemService` + `MainAppLoginItem` (`SMAppService.mainApp`), injected with `.environment`, status re-read on Settings `onAppear` and in `popoverWillShow`. RED: test target failed to compile (`cannot find type LoginItemStatus`). GREEN: `-only-testing:batteryTests` TEST SUCCEEDED, 223 passed, 0 failed (5 launch-at-login tests + 1 tab test).
 
 ## Next step
 T1-T3 (app code), then T4, then T5 after authorization.
