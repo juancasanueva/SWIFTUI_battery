@@ -26,8 +26,8 @@ macOS does not expose battery levels for devices paired to Logitech receivers. T
 ## Tasks
 - [x] T1 App shell: MenuBarExtra, LSUIElement, remove SwiftData template, sandbox USB entitlement. Route: delegated (writer trigger: 2+ non-trivial files).
 - [x] T2 HID++ protocol core (pure, tested): report building, response/error parsing, feature lookup, battery parsers, voltage mapping. Route: delegated.
-- [ ] T3 IOKit transport + device service: IOHIDManager for Logitech `0xFF00` interfaces, request/response with timeout, device enumeration, type/name, battery query. Route: delegated. Implemented and unit-tested; real-hardware check pending (receivers were not attached).
-- [ ] T4 Menu bar UI + refresh: label formatting (tested), device list, refresh timer, hot-plug, Refresh/Quit. Route: delegated. Implemented and unit-tested; real-hardware check pending.
+- [x] T3 IOKit transport + device service: IOHIDManager for Logitech `0xFF00` interfaces, request/response with timeout, device enumeration, type/name, battery query. Route: delegated. Verified on hardware.
+- [x] T4 Menu bar UI + refresh: label formatting (tested), device list, refresh timer, hot-plug, Refresh/Quit. Route: delegated. Verified on hardware (logs).
 
 ## Acceptance criteria
 - App appears only in the menu bar and shows real keyboard and mouse battery percentages from the attached receivers.
@@ -57,5 +57,9 @@ macOS does not expose battery levels for devices paired to Logitech receivers. T
 - T4 (commit with this doc update) feat: show keyboard and mouse battery in the menu bar. `MenuBarLabel` (pure: keyboard/mouse segments, `—`, `~`, charging flag, row status, kind symbols), `BatteryMenuBarLabel` (one `Text` with inline SF Symbols), `BatteryMenuContent` (permission/failed row, device rows, Refresh, Quit). Refresh on launch, on hot-plug (500 ms debounce), and every 5 minutes; overlapping requests coalesce into one more pass. RED: compile failure (`cannot find 'MenuBarLabel' in scope`). GREEN: TEST SUCCEEDED, 150 cases passed. `xcodebuild build` → BUILD SUCCEEDED.
 - Hardware run (2026-10-22): the app launched; logs show `IOHIDManager opened` (no permission error) and `Refreshing 0 receiver(s)`. The receivers were not attached at the time: `hidutil list` showed no 0x046D service, and the USB tree showed only hubs and an SSD. Receiver opening, the report-ID byte layout, `SetReport` acceptance, and the real battery readings are NOT verified yet.
 
+- Hardware run 2 (2026-10-22, receivers attached, build of `eafc2f4`): `IOHIDManager opened`; `Receiver found` for Bolt (0xC547) and Unifying (0xC52B); first input reports `11 01 00 0B ...` (report ID present at byte 0, so `SetReport` 0x11/20 bytes accepted); Unifying #1 = MX Keys Wireless Keyboard (keyboard) 50% discharging via 0x1000; Bolt #1 = PRO X SUPERLIGHT 2 SE (mouse) 67% discharging via 0x1004. No permission prompt or error.
+- RDD slice 2 (`545465a..eafc2f4`): risk medium, review due (`slice_budget_reached`), consent granted, reliability lens APPROVED and acknowledged (lineage `review-d9a5c1b929dfded1`). Reviewed boundary advances to `eafc2f4`.
+- Advisory (non-blocking) follow-ups, not yet accepted: `R3-stale-slot-cache` (identity cache per slot never invalidated while receiver attached), `R3-identity-error-hides-device` (a 0x0005 feature error hides a reachable device), `R3-transport-concurrency-untested` (serialization/timeout/removal paths untested), `R3-service-logic-untested`.
+
 ## Next step
-Plug in the Unifying and Bolt receivers, launch the app, and run `log show --last 2m --predicate 'subsystem == "com.juancasanueva.battery"' --style compact`. Confirm "Receiver found" for both, check the "First input report" bytes (byte 0 should be 0x10/0x11), and read the keyboard and mouse battery lines. Then check off T3/T4 and run the RDD assessment for slice 2.
+Finish the slice 2 review, then open the stacked PRs (slice 1 → main, slice 2 → slice 1) when the user asks.
