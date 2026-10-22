@@ -28,7 +28,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		BCCB2B91308A468700151302 /* battery.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = battery.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		BCCB2B91308A468700151302 /* PeriBattery.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PeriBattery.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BCCB2BA0308A468800151302 /* batteryTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = batteryTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BCCB2BAA308A468800151302 /* batteryUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = batteryUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -103,7 +103,7 @@
 		BCCB2B92308A468700151302 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				BCCB2B91308A468700151302 /* battery.app */,
+				BCCB2B91308A468700151302 /* PeriBattery.app */,
 				BCCB2BA0308A468800151302 /* batteryTests.xctest */,
 				BCCB2BAA308A468800151302 /* batteryUITests.xctest */,
 			);
@@ -133,7 +133,7 @@
 				BCA200000000000000000002 /* Sparkle */,
 			);
 			productName = battery;
-			productReference = BCCB2B91308A468700151302 /* battery.app */;
+			productReference = BCCB2B91308A468700151302 /* PeriBattery.app */;
 			productType = "com.apple.product-type.application";
 		};
 		BCCB2B9F308A468800151302 /* batteryTests */ = {
