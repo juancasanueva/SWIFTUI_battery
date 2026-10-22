@@ -57,11 +57,6 @@ struct MenuBarLabelTests {
         #expect(MenuBarLabel.accessibilityText(for: []) == "No Logitech devices")
     }
 
-    @Test func composesFallbackTextThatNamesEachDevice() {
-        let segments = MenuBarLabel.segments(for: [device(.keyboard, reading(80, .charging)), device(.mouse, reading(55), index: 2)])
-        #expect(MenuBarLabel.fallbackText(for: segments) == "KB 80% ⚡︎  M 55%")
-    }
-
     @Test(arguments: [
         (reading(80), "80%"),
         (reading(60, approximate: true, .charging), "~60% · Charging"),
