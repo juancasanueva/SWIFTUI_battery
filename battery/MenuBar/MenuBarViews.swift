@@ -13,7 +13,7 @@ struct BatteryMenuBarLabel: View {
             } else if let image = Self.renderedImage(for: segments) {
                 Image(nsImage: image)
             } else {
-                Text(segments.map(\.text).joined(separator: "  "))
+                Text(MenuBarLabel.fallbackText(for: segments))
             }
         }
         .accessibilityLabel(MenuBarLabel.accessibilityText(for: segments))
@@ -37,7 +37,9 @@ struct BatteryMenuBarLabel: View {
         .foregroundStyle(.black)
 
         let renderer = ImageRenderer(content: content)
-        renderer.scale = NSScreen.main?.backingScaleFactor ?? 2
+        // Render for the densest attached screen: the status item can sit on any display,
+        // and a higher-resolution image still downsamples cleanly on lower-density ones.
+        renderer.scale = max(2, NSScreen.screens.map(\.backingScaleFactor).max() ?? 2)
         guard let image = renderer.nsImage else { return nil }
         image.isTemplate = true
         return image

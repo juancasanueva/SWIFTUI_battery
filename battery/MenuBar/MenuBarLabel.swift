@@ -47,6 +47,14 @@ nonisolated enum MenuBarLabel {
         }.joined(separator: ", ")
     }
 
+    /// Plain-text label used when the icon image cannot be rendered: `KB 80% ⚡︎  M 55%`.
+    static func fallbackText(for segments: [Segment]) -> String {
+        segments.map { segment in
+            let name = segment.symbol == keyboardSymbol ? "KB" : "M"
+            return [name, segment.text, segment.isCharging ? "⚡︎" : ""].filter { !$0.isEmpty }.joined(separator: " ")
+        }.joined(separator: "  ")
+    }
+
     static func rowStatus(for battery: BatteryState) -> String {
         switch battery {
         case let .reading(reading, _):
