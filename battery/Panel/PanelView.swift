@@ -227,15 +227,8 @@ struct PanelFooter: View {
     let onRefresh: () -> Void
 
     var body: some View {
+        // Refresh and its spinner on the left edge, Quit on the right.
         HStack(spacing: 10) {
-            if isRefreshing {
-                ProgressView()
-                    .controlSize(.small)
-                Text("Refreshing…")
-                    .font(Theme.font(.caption))
-                    .foregroundStyle(Theme.dim)
-            }
-            Spacer()
             Button(action: onRefresh) {
                 Image(systemName: "arrow.clockwise")
             }
@@ -244,6 +237,14 @@ struct PanelFooter: View {
             .help("Refresh (⌘R)")
             .accessibilityLabel("Refresh")
             .disabled(isRefreshing)
+            if isRefreshing {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Refreshing…")
+                    .font(Theme.font(.caption))
+                    .foregroundStyle(Theme.dim)
+            }
+            Spacer()
             Button("Quit") {
                 NSApplication.shared.terminate(nil)
             }
