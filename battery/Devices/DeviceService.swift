@@ -27,19 +27,33 @@ final class DeviceService {
     private(set) var isRefreshing = false
     private(set) var lastRefreshed: Date?
 
+    static let refreshInterval: Duration = .seconds(5 * 60)
+    /// Receivers attach one interface at a time; wait for the burst to settle before probing.
+    static let hotPlugDebounce: Duration = .milliseconds(500)
+
     @ObservationIgnored private let transport = HIDPPTransport()
     @ObservationIgnored private let logger = Logger(subsystem: "com.juancasanueva.battery", category: "devices")
-    @ObservationIgnored private var known: [DeviceKey: KnownDevice] = [:]
+    @ObservationIgnored private var slots = SlotCache()
     @ObservationIgnored private var refreshAgain = false
     @ObservationIgnored private var isStarted = false
+    @ObservationIgnored private var periodicTask: Task<Void, Never>?
+    @ObservationIgnored private var hotPlugTask: Task<Void, Never>?
 
     func start() {
         guard !isStarted else { return }
         isStarted = true
         transport.onReceiversChanged = { [weak self] in self?.receiversChanged() }
+        transport.onUnsolicitedReport = { [weak self] receiver, report in self?.handleUnsolicited(report, from: receiver) }
         transport.start()
         updateAccess()
         Task { await refresh() }
+        periodicTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: Self.refreshInterval)
+                guard !Task.isCancelled, let self else { return }
+                await self.refresh()
+            }
+        }
     }
 
     /// Re-reads every device. A refresh requested while one is running runs once more afterwards instead of overlapping.
@@ -61,8 +75,30 @@ final class DeviceService {
     private func receiversChanged() {
         receivers = transport.receivers
         let attached = Set(receivers.map(\.id))
-        known = known.filter { attached.contains($0.key.receiverID) }
+        slots.retain(receivers: attached)
         updateAccess()
+        scheduleRefresh()
+    }
+
+    /// A link change on a slot may mean a different device was paired into it: forget what we cached for it.
+    private func handleUnsolicited(_ report: [UInt8], from receiver: Receiver) {
+        guard let notification = HIDPPConnectionNotification(report: report) else { return }
+        slots.invalidate(DeviceKey(receiverID: receiver.id, deviceIndex: notification.deviceIndex))
+        logger.notice("""
+            \(receiver.name, privacy: .public) #\(notification.deviceIndex, privacy: .public): \
+            link \(notification.isLinkEstablished ? "established" : "lost", privacy: .public)
+            """)
+        if notification.isLinkEstablished { scheduleRefresh() }
+    }
+
+    /// Debounced: bursts of hot-plug or connection events collapse into one refresh.
+    private func scheduleRefresh() {
+        hotPlugTask?.cancel()
+        hotPlugTask = Task { [weak self] in
+            try? await Task.sleep(for: Self.hotPlugDebounce)
+            guard !Task.isCancelled, let self else { return }
+            await self.refresh()
+        }
     }
 
     private func updateAccess() {
@@ -84,20 +120,40 @@ final class DeviceService {
 
     private func readDevice(_ index: UInt8, on receiver: Receiver) async -> LogitechDevice? {
         let key = DeviceKey(receiverID: receiver.id, deviceIndex: index)
-        var probe = DeviceProbe(deviceIndex: index, features: known[key]?.features ?? FeatureTable()) { [transport] in
+        let epoch = slots.epoch(key)
+        let trusted = slots.trusted(key)
+        var probe = DeviceProbe(deviceIndex: index, features: trusted?.features ?? FeatureTable()) { [transport] in
             try await transport.send($0, to: receiver)
         }
 
         let identity: DeviceIdentity
-        if let cached = known[key]?.identity {
-            identity = cached
+        var isIdentityCacheable = true
+        if let trusted {
+            identity = trusted.identity
         } else {
+            let result: Result<DeviceIdentity, any Error>
             do {
-                identity = try await probe.readIdentity()
+                result = .success(try await probe.readIdentity())
             } catch {
-                // Unpaired slot, or a device that has been asleep since launch.
-                logger.debug("\(receiver.name, privacy: .public) #\(index, privacy: .public): no answer (\(String(describing: error), privacy: .public))")
-                return nil
+                result = .failure(error)
+            }
+            switch DeviceProbe.identityOutcome(result) {
+            case let .identified(read):
+                identity = read
+            case .fallback:
+                // Reachable, but 0x0005 failed: keep the device and ask for its name again next refresh.
+                logger.notice("\(receiver.name, privacy: .public) #\(index, privacy: .public): name lookup failed (\(Self.describe(result), privacy: .public))")
+                identity = .fallback
+                isIdentityCacheable = false
+            case .unreachable:
+                guard let last = slots.lastIdentity(key) else {
+                    // Unpaired slot, or a device that has been asleep since launch.
+                    logger.debug("\(receiver.name, privacy: .public) #\(index, privacy: .public): no answer (\(Self.describe(result), privacy: .public))")
+                    return nil
+                }
+                // Seen before: list it as unavailable and identify it again once it answers.
+                return LogitechDevice(receiver: receiver, deviceIndex: index, name: last.displayName(deviceIndex: index),
+                                      kind: last.kind, battery: .unavailable)
             }
             logger.notice("""
                 Device discovered on \(receiver.name, privacy: .public) #\(index, privacy: .public): \
@@ -106,10 +162,22 @@ final class DeviceService {
         }
 
         let battery = await probe.readBattery()
-        known[key] = KnownDevice(identity: identity, features: probe.features)
+        if battery == .unavailable {
+            // Stopped answering: whatever answers in this slot next is identified from scratch.
+            slots.invalidate(key)
+        } else if isIdentityCacheable {
+            slots.store(key, identity: identity, features: probe.features, epoch: epoch)
+        }
         let name = identity.displayName(deviceIndex: index)
         logger.notice("Battery \(name, privacy: .public): \(Self.describe(battery), privacy: .public)")
         return LogitechDevice(receiver: receiver, deviceIndex: index, name: name, kind: identity.kind, battery: battery)
+    }
+
+    private static func describe(_ result: Result<DeviceIdentity, any Error>) -> String {
+        switch result {
+        case let .success(identity): String(describing: identity)
+        case let .failure(error): String(describing: error)
+        }
     }
 
     private static func describe(_ battery: BatteryState) -> String {
@@ -121,14 +189,4 @@ final class DeviceService {
         case .unsupported: return "no battery feature"
         }
     }
-}
-
-private struct DeviceKey: Hashable {
-    let receiverID: UInt64
-    let deviceIndex: UInt8
-}
-
-private struct KnownDevice {
-    let identity: DeviceIdentity
-    let features: FeatureTable
 }

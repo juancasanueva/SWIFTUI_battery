@@ -252,3 +252,34 @@ struct TransportHelperTests {
         #expect(Receiver.displayName(productID: productID, productString: productString) == expected)
     }
 }
+
+@MainActor
+@Suite("Device probe identity outcome")
+struct DeviceIdentityOutcomeTests {
+    private struct UnexpectedError: Error {}
+
+    @Test func keepsAReadIdentity() {
+        let identity = DeviceIdentity(name: "MX Keys", kind: .keyboard)
+        #expect(DeviceProbe.identityOutcome(.success(identity)) == .identified(identity))
+    }
+
+    @Test(arguments: [
+        HIDPPTransportError.deviceUnavailable(code: 0x09), .timeout, .receiverNotFound, .io(-536_870_212),
+    ])
+    func treatsUnreachableErrorsAsNotPresent(error: HIDPPTransportError) {
+        #expect(DeviceProbe.identityOutcome(.failure(error)) == .unreachable)
+    }
+
+    @Test func keepsAReachableDeviceWhoseNameLookupFailed() {
+        #expect(DeviceProbe.identityOutcome(.failure(HIDPPTransportError.featureError(code: 0x05))) == .fallback)
+    }
+
+    @Test func keepsTheDeviceOnUnexpectedErrors() {
+        #expect(DeviceProbe.identityOutcome(.failure(UnexpectedError())) == .fallback)
+    }
+
+    @Test func fallbackIdentityIsUnknownAndNamedByIndex() {
+        #expect(DeviceIdentity.fallback == DeviceIdentity(name: nil, kind: .unknown))
+        #expect(DeviceIdentity.fallback.displayName(deviceIndex: 4) == "Device 4")
+    }
+}
