@@ -8,7 +8,8 @@ struct PanelView: View {
     @FocusState private var hasKeyboardFocus: Bool
 
     var body: some View {
-        PanelShell(isRefreshing: service.isRefreshing, onRefresh: refresh) {
+        PanelShell(summary: BatteryGauge.summary(deviceCount: service.devices.count),
+                   isRefreshing: service.isRefreshing, onRefresh: refresh) {
             PanelContent(service: service)
         }
         .focusable()
@@ -30,13 +31,14 @@ struct PanelView: View {
 
 /// Presentational frame of the panel: header, content, and a footer.
 struct PanelShell<Content: View>: View {
+    let summary: String
     let isRefreshing: Bool
     let onRefresh: () -> Void
     @ViewBuilder let content: Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            PanelHeader()
+            PanelHeader(summary: summary)
                 .padding(.horizontal, 16)
                 .padding(.top, 14)
                 .padding(.bottom, 12)
@@ -59,45 +61,125 @@ struct PanelShell<Content: View>: View {
 }
 
 struct PanelHeader: View {
+    let summary: String
+
     var body: some View {
-        Text("Battery")
-            .font(Theme.font(.display, weight: .bold))
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Battery")
+                .font(Theme.font(.display, weight: .bold))
+            Text(summary.uppercased())
+                .font(Theme.font(.caption, weight: .semibold))
+                .tracking(0.8)
+                .foregroundStyle(Theme.dim)
+                .contentTransition(.numericText())
+        }
     }
 }
 
-/// The permission row and the device list.
+/// The permission row, the device cards, or the empty state.
 struct PanelContent: View {
     let service: DeviceService
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            switch service.access {
-            case .ok:
-                EmptyView()
-            case let .permissionNeeded(code):
-                Button("Permission needed (\(HIDPPTransport.describe(code))) — Open Settings…") {
+            AccessRow(access: service.access)
+            SectionHeader("DEVICES") {
+                if let lastRefreshed = service.lastRefreshed {
+                    Text("Updated \(lastRefreshed.formatted(date: .omitted, time: .shortened))")
+                        .font(Theme.font(.caption))
+                        .foregroundStyle(Theme.dim)
+                }
+            }
+            if service.devices.isEmpty {
+                EmptyDevicesCard(hasReceivers: !service.receivers.isEmpty)
+                    .transition(cardTransition)
+            } else {
+                ForEach(service.devices) { device in
+                    DeviceCard(device: device)
+                        .transition(cardTransition)
+                }
+            }
+        }
+        .animation(reduceMotion ? nil : .smooth, value: service.devices.map(\.id))
+        .animation(reduceMotion ? nil : .smooth, value: service.access)
+    }
+
+    private var cardTransition: AnyTransition {
+        reduceMotion ? .identity : .opacity.combined(with: .scale(scale: 0.97, anchor: .top))
+    }
+}
+
+/// Shown only when the receivers cannot be opened.
+struct AccessRow: View {
+    let access: DeviceService.AccessState
+
+    var body: some View {
+        switch access {
+        case .ok:
+            EmptyView()
+        case let .permissionNeeded(code):
+            row(symbol: "lock.shield", title: "Permission needed",
+                detail: "Allow Input Monitoring for Battery (\(HIDPPTransport.describe(code))).") {
+                Button("Open Settings…") {
                     if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
                         NSWorkspace.shared.open(url)
                     }
                 }
-            case let .failed(code):
-                Text("Cannot open receivers (\(HIDPPTransport.describe(code)))")
+                .buttonStyle(.bordered)
+                .controlSize(.small)
             }
-
-            if service.devices.isEmpty {
-                Text(service.receivers.isEmpty ? "No Logitech receiver connected" : "No devices found")
-                    .foregroundStyle(Theme.dim)
-            } else {
-                ForEach(service.devices) { device in
-                    Label {
-                        Text("\(device.name) — \(MenuBarLabel.rowStatus(for: device.battery))")
-                    } icon: {
-                        Image(systemName: MenuBarLabel.symbol(for: device.kind))
-                    }
-                }
-            }
+        case let .failed(code):
+            row(symbol: "exclamationmark.triangle", title: "Cannot open receivers",
+                detail: HIDPPTransport.describe(code)) { EmptyView() }
         }
-        .font(Theme.font(.body))
+    }
+
+    private func row(symbol: String, title: String, detail: String,
+                     @ViewBuilder action: () -> some View) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: symbol)
+                .font(.system(size: 16))
+                .foregroundStyle(Theme.urgent)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(Theme.font(.body, weight: .semibold))
+                    .foregroundStyle(Theme.urgent)
+                Text(detail)
+                    .font(Theme.font(.small))
+                    .foregroundStyle(Theme.dim)
+                    .fixedSize(horizontal: false, vertical: true)
+                action()
+                    .padding(.top, 2)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .card()
+        .padding(.bottom, 4)
+    }
+}
+
+struct EmptyDevicesCard: View {
+    let hasReceivers: Bool
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: hasReceivers ? "keyboard.badge.ellipsis" : "cable.connector.slash")
+                .font(.system(size: 22))
+                .foregroundStyle(Theme.dim)
+                .accessibilityHidden(true)
+            Text(hasReceivers ? "No devices found" : "No Logitech receiver connected")
+                .font(Theme.font(.body))
+                .foregroundStyle(Theme.dim)
+                .multilineTextAlignment(.center)
+        }
+        .padding(.vertical, 18)
+        .padding(.horizontal, 20)
+        .frame(maxWidth: .infinity)
+        .card()
     }
 }
 

@@ -20,7 +20,7 @@ Replace the plain `MenuBarExtra` menu with a panel that matches the matchday app
 
 ## Tasks
 - [x] T1 Status item + popover shell: `AppDelegate`, `StatusItemController`, `PanelPresentation` (reopen guard, Escape), `Theme`; remove `MenuBarExtra`. Route: delegated (writer trigger: 2+ non-trivial files).
-- [ ] T2 Panel content and animations: device cards, battery bar, pulse, hover, footer, permission row, Reduce Motion. Route: delegated.
+- [x] T2 Panel content and animations: device cards, battery bar, pulse, hover, footer, permission row, Reduce Motion. Route: delegated.
 
 ## Acceptance criteria
 - Clicking the menu bar icon opens a panel with an arrow pointing at it; clicking it again, clicking outside, or Escape closes it.
@@ -37,8 +37,12 @@ Replace the plain `MenuBarExtra` menu with a panel that matches the matchday app
 
 ## Progress / evidence
 - Branch: `feat/popover-panel` (from `main` `e61f69a`).
-- T1 (delegated writer): `AppDelegate`, `StatusItemController` (status item image extracted to `StatusItemImage`, redrawn via re-armed `withObservationTracking`), `PanelPresentation` (0.3 s reopen guard, injectable clock), `Theme`, minimal `PanelView` (header, device rows, permission row, footer, Escape). `MenuBarExtra` and `MenuBarViews.swift` removed. Popover sized by `NSHostingController.sizingOptions = .preferredContentSize`, width 340.
+- T1 (delegated writer, commit `12a1c5c`): `AppDelegate`, `StatusItemController` (status item image extracted to `StatusItemImage`, redrawn via re-armed `withObservationTracking`), `PanelPresentation` (0.3 s reopen guard, injectable clock), `Theme`, minimal `PanelView` (header, device rows, permission row, footer, Escape). `MenuBarExtra` and `MenuBarViews.swift` removed. Popover sized by `NSHostingController.sizingOptions = .preferredContentSize`, width 340.
   - RED: `PanelPresentationTests` failed to compile (`cannot find 'PanelPresentation'`). GREEN: unit tests `** TEST SUCCEEDED **`. Build `** BUILD SUCCEEDED **` with no Swift warnings. Launch: app running, log shows Unifying + Bolt receivers and battery readings. Visual check of the panel pending the human.
 
+- T2 (delegated writer, commit `feat: style the battery panel like matchday with animations`, the commit that adds this line): header with app name + device-count summary, `SectionHeader` "DEVICES" with last-updated time, `DeviceCard` (kind symbol, name, receiver, `rowStatus` with `.numericText()`, pulsing charging bolt, `BatteryBar` colored by level and animated with `.smooth`), hover `.easeOut(0.12)`, card insert/remove transition, `AccessRow` (permission with Open Settings, failure), empty state, footer spinner/Refresh (⌘R)/Quit (⌘Q). All motion gated on `accessibilityReduceMotion`. Pure rules in `BatteryGauge` (≤15% critical, ≤30% low, fill clamped 0...1, summary text).
+  - RED: `BatteryGaugeTests` failed to compile (`cannot find 'BatteryGauge'`). GREEN: unit tests `** TEST SUCCEEDED **` (13 gauge cases pass). Clean build: no Swift warnings. Launch: app running, Unifying + Bolt receivers found; MX Keys reads "unknown level charging"; the Bolt device answers with an HID++ error (offline, pre-existing device state).
+  - Pending (human): visual check of the panel (arrow, open/close toggle, click outside, Escape, light/dark, hover, charging pulse, Reduce Motion).
+
 ## Next step
-T2.
+Human visual check of the panel; then native review / PR decision.
