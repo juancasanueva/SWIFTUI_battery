@@ -12,6 +12,8 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     private let launchAtLogin: LaunchAtLogin
     /// `nil` hides the Updates card.
     private let updater: (any AppUpdating)?
+    /// Shows the About window.
+    private let openAbout: () -> Void
     private let presentation = PanelPresentation()
     private let statusItem: NSStatusItem
     private let popover = NSPopover()
@@ -20,10 +22,12 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     /// Segments currently shown; `nil` before the first draw.
     private var shownSegments: [MenuBarLabel.Segment]?
 
-    init(service: DeviceService, launchAtLogin: LaunchAtLogin, updater: (any AppUpdating)?) {
+    init(service: DeviceService, launchAtLogin: LaunchAtLogin, updater: (any AppUpdating)?,
+         openAbout: @escaping () -> Void) {
         self.service = service
         self.launchAtLogin = launchAtLogin
         self.updater = updater
+        self.openAbout = openAbout
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
 
@@ -56,6 +60,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         popover.delegate = self
         presentation.onClose = { [weak self] in self?.popover.performClose(nil) }
         presentation.onCheckForUpdates = { [weak self] in self?.handleCheckForUpdates() }
+        presentation.onOpenAbout = { [weak self] in self?.openAbout() }
         // Hosted for the controller's whole life; the popover follows the panel's fitting size.
         let host = NSHostingController(rootView: PanelView(service: service, presentation: presentation)
             .environment(launchAtLogin)
