@@ -90,7 +90,7 @@ struct DeviceProbeBatteryTests {
 
         let state = await probe.readBattery()
 
-        let expected = BatteryReading(percent: 100, isApproximate: true, chargingState: .discharging)
+        let expected = BatteryReading(percent: 95, isApproximate: true, chargingState: .discharging)
         #expect(state == .reading(expected, source: .batteryStatus))
     }
 

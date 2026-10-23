@@ -67,6 +67,17 @@ nonisolated enum BatteryStatus {
     /// Below this many levels the reported value is a coarse step, not a percentage (same rule as the Linux driver).
     private static let minimumPercentageLevels: UInt8 = 10
 
+    /// Coarse level → shown percentage, mirroring the Linux driver's capacity_level buckets
+    /// (full, normal, low, critical) and the plugin's percentages for them.
+    private static func bucketedPercent(level: Int) -> Int {
+        switch level {
+        case 81...: 95
+        case 30...80: 60
+        case 11...29: 20
+        default: 5
+        }
+    }
+
     static func statusRequest(deviceIndex: UInt8, featureIndex: UInt8) -> HIDPPRequest {
         HIDPPRequest(deviceIndex: deviceIndex, featureIndex: featureIndex, function: 0)
     }
@@ -85,7 +96,9 @@ nonisolated enum BatteryStatus {
         let state = chargingState(code: payload[2])
         // While recharging the level byte reads 0, meaning "unknown"; a 0 while discharging can be a real empty battery.
         let isLevelUnknown = payload[0] == 0 && (state == .charging || state == .slowCharging)
-        return BatteryReading(percent: isLevelUnknown ? nil : clampedPercent(payload[0]), isApproximate: !reportsPercentage,
+        let level = clampedPercent(payload[0])
+        let percent = reportsPercentage ? level : bucketedPercent(level: level)
+        return BatteryReading(percent: isLevelUnknown ? nil : percent, isApproximate: !reportsPercentage,
                               chargingState: state)
     }
 
