@@ -72,8 +72,8 @@ nonisolated enum BatteryStatus {
     private static func bucketedPercent(level: Int) -> Int {
         switch level {
         case 81...: 95
-        case 30...80: 60
-        case 11...29: 20
+        case 31...80: 60
+        case 11...30: 20
         default: 5
         }
     }

@@ -85,8 +85,8 @@ struct BatteryStatusTests {
     }
 
     @Test(arguments: [
-        (UInt8(100), 95), (81, 95), (80, 60), (50, 60), (30, 60),
-        (29, 20), (11, 20), (10, 5), (0, 5), (200, 95),
+        (UInt8(100), 95), (81, 95), (80, 60), (50, 60), (31, 60),
+        (30, 20), (11, 20), (10, 5), (0, 5), (200, 95),
     ])
     func bucketsCoarseLevelsLikeTheLinuxDriver(level: UInt8, percent: Int) {
         let reading = BatteryStatus.parseStatus(payload(level, 0, 0), reportsPercentage: false)
