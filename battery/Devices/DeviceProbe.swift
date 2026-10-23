@@ -17,6 +17,11 @@ nonisolated struct FeatureTable: Sendable, Equatable {
     mutating func record(_ feature: HIDPPFeature, index: UInt8?) {
         entries[feature] = index.map { .supported(index: $0) } ?? .unsupported
     }
+
+    /// The battery feature the device exposes at `index`, if any.
+    func batteryFeature(at index: UInt8) -> HIDPPFeature? {
+        DeviceProbe.batteryFeatureOrder.first { lookup($0) == .supported(index: index) }
+    }
 }
 
 /// HID++ 2.0 queries for one paired device, independent of IOKit: `send` delivers a request and returns its payload.

@@ -93,6 +93,10 @@ final class DeviceService {
 
     /// A link change on a slot may mean a different device was paired into it: forget what we cached for it.
     private func handleUnsolicited(_ report: [UInt8], from receiver: Receiver) {
+        if let event = HIDPPFeatureEvent(report: report) {
+            handleFeatureEvent(event, from: receiver)
+            return
+        }
         guard let notification = HIDPPConnectionNotification(report: report) else { return }
         slots.invalidate(DeviceKey(receiverID: receiver.id, deviceIndex: notification.deviceIndex))
         logger.notice("""
@@ -100,6 +104,18 @@ final class DeviceService {
             link \(notification.isLinkEstablished ? "established" : "lost", privacy: .public)
             """)
         if notification.isLinkEstablished { scheduleRefresh() }
+    }
+
+    /// A device broadcasts its battery feature when the level or charging state changes (e.g. the cable is
+    /// plugged or unplugged); re-read it now instead of waiting for the next periodic refresh.
+    private func handleFeatureEvent(_ event: HIDPPFeatureEvent, from receiver: Receiver) {
+        let key = DeviceKey(receiverID: receiver.id, deviceIndex: event.deviceIndex)
+        guard let feature = slots.trusted(key)?.features.batteryFeature(at: event.featureIndex) else { return }
+        logger.notice("""
+            \(receiver.name, privacy: .public) #\(event.deviceIndex, privacy: .public): \
+            battery event via \(String(format: "0x%04X", feature.rawValue), privacy: .public)
+            """)
+        scheduleRefresh()
     }
 
     /// Debounced: bursts of hot-plug or connection events collapse into one refresh.

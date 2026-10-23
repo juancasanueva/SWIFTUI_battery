@@ -337,3 +337,17 @@ struct DeviceIdentityOutcomeTests {
         #expect(DeviceIdentity.fallback.displayName(deviceIndex: 4) == "Device 4")
     }
 }
+
+@Suite("Feature table")
+struct FeatureTableTests {
+    @Test func findsTheBatteryFeatureAtAnIndex() {
+        var table = FeatureTable()
+        table.record(.deviceNameType, index: 3)
+        table.record(.unifiedBattery, index: nil)
+        table.record(.batteryStatus, index: 9)
+
+        #expect(table.batteryFeature(at: 9) == .batteryStatus)
+        #expect(table.batteryFeature(at: 3) == nil) // a known feature, but not a battery one
+        #expect(table.batteryFeature(at: 7) == nil)
+    }
+}
