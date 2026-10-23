@@ -71,11 +71,26 @@ struct DeviceProbeBatteryTests {
         let device = ScriptedDevice()
         device.features = [.batteryStatus: 9]
         device.respond(feature: .batteryStatus, function: 0, with: .success(payload(40, 20, 1)))
+        device.respond(feature: .batteryStatus, function: 1, with: .success(payload(100, 0x02)))
         var probe = makeProbe(device)
 
         let state = await probe.readBattery()
 
         let expected = BatteryReading(percent: 40, isApproximate: false, chargingState: .charging)
+        #expect(state == .reading(expected, source: .batteryStatus))
+    }
+
+    @Test func marksCoarseBatteryStatusLevelsAsApproximate() async {
+        // Bytes captured from an MX Keys: 4 levels without the mileage flag, at the top level (next: 50).
+        let device = ScriptedDevice()
+        device.features = [.batteryStatus: 9]
+        device.respond(feature: .batteryStatus, function: 0, with: .success(payload(0x64, 0x32, 0x00, 0x00)))
+        device.respond(feature: .batteryStatus, function: 1, with: .success(payload(0x04, 0x04, 0xC0, 0x06)))
+        var probe = makeProbe(device)
+
+        let state = await probe.readBattery()
+
+        let expected = BatteryReading(percent: 100, isApproximate: true, chargingState: .discharging)
         #expect(state == .reading(expected, source: .batteryStatus))
     }
 
@@ -96,6 +111,7 @@ struct DeviceProbeBatteryTests {
         device.features = [.unifiedBattery: 8, .batteryStatus: 9]
         device.respond(feature: .unifiedBattery, function: 0, with: .failure(.featureError(code: 0x05)))
         device.respond(feature: .batteryStatus, function: 0, with: .success(payload(55, 0, 0)))
+        device.respond(feature: .batteryStatus, function: 1, with: .success(payload(100, 0x02)))
         var probe = makeProbe(device)
 
         let state = await probe.readBattery()
@@ -108,6 +124,7 @@ struct DeviceProbeBatteryTests {
         let device = ScriptedDevice()
         device.features = [.batteryVoltage: 7, .batteryStatus: 9]
         device.respond(feature: .batteryStatus, function: 0, with: .success(payload(30, 0, 0)))
+        device.respond(feature: .batteryStatus, function: 1, with: .success(payload(100, 0x02)))
         device.respond(feature: .batteryVoltage, function: 0, with: .success(payload(0, 0, 0)))
         var probe = makeProbe(device)
 
@@ -141,6 +158,7 @@ struct DeviceProbeBatteryTests {
         let device = ScriptedDevice()
         device.features = [.batteryStatus: 9]
         device.respond(feature: .batteryStatus, function: 0, with: .success(payload(40, 20, 0)))
+        device.respond(feature: .batteryStatus, function: 1, with: .success(payload(100, 0x02)))
         var probe = makeProbe(device)
 
         _ = await probe.readBattery()

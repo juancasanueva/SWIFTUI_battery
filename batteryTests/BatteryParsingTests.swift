@@ -62,8 +62,17 @@ struct UnifiedBatteryTests {
 
 @Suite("BatteryStatus 0x1000")
 struct BatteryStatusTests {
-    @Test func buildsRequest() {
+    @Test func buildsRequests() {
         #expect(BatteryStatus.statusRequest(deviceIndex: 1, featureIndex: 6).function == 0)
+        #expect(BatteryStatus.capabilityRequest(deviceIndex: 1, featureIndex: 6).function == 1)
+    }
+
+    @Test func reportsPercentageOnlyWithTenLevelsAndMileage() {
+        #expect(BatteryStatus.reportsPercentage(capabilities: payload(10, 0x02)))
+        #expect(BatteryStatus.reportsPercentage(capabilities: payload(100, 0x06)))
+        #expect(!BatteryStatus.reportsPercentage(capabilities: payload(4, 0x02)))
+        #expect(!BatteryStatus.reportsPercentage(capabilities: payload(100, 0x04)))
+        #expect(!BatteryStatus.reportsPercentage(capabilities: []))
     }
 
     @Test(arguments: [
@@ -71,27 +80,32 @@ struct BatteryStatusTests {
         (4, .slowCharging), (5, .error), (6, .error), (7, .unknown),
     ])
     func parsesStatus(code: UInt8, state: ChargingState) {
-        let reading = BatteryStatus.parseStatus(payload(45, 30, code))
+        let reading = BatteryStatus.parseStatus(payload(45, 30, code), reportsPercentage: true)
         #expect(reading == BatteryReading(percent: 45, isApproximate: false, chargingState: state))
     }
 
+    @Test func marksCoarseLevelsAsApproximate() {
+        let reading = BatteryStatus.parseStatus(payload(100, 50, 0), reportsPercentage: false)
+        #expect(reading == BatteryReading(percent: 100, isApproximate: true, chargingState: .discharging))
+    }
+
     @Test func rejectsShortPayload() {
-        #expect(BatteryStatus.parseStatus([45, 30]) == nil)
+        #expect(BatteryStatus.parseStatus([45, 30], reportsPercentage: true) == nil)
     }
 
     @Test(arguments: [(UInt8(1), ChargingState.charging), (2, .charging), (4, .slowCharging)])
     func treatsZeroWhileChargingAsUnknownLevel(code: UInt8, state: ChargingState) {
-        let reading = BatteryStatus.parseStatus(payload(0, 0, code))
+        let reading = BatteryStatus.parseStatus(payload(0, 0, code), reportsPercentage: true)
         #expect(reading == BatteryReading(percent: nil, isApproximate: false, chargingState: state))
     }
 
     @Test(arguments: [UInt8(0), 3, 5])
     func keepsZeroWhenNotCharging(code: UInt8) {
-        #expect(BatteryStatus.parseStatus(payload(0, 0, code))?.percent == 0)
+        #expect(BatteryStatus.parseStatus(payload(0, 0, code), reportsPercentage: true)?.percent == 0)
     }
 
     @Test func clampsOutOfRangePercent() {
-        #expect(BatteryStatus.parseStatus(payload(200, 0, 0))?.percent == 100)
+        #expect(BatteryStatus.parseStatus(payload(200, 0, 0), reportsPercentage: true)?.percent == 100)
     }
 }
 
