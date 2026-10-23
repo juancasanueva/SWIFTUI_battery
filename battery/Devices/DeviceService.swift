@@ -95,7 +95,6 @@ final class DeviceService {
     private func handleUnsolicited(_ report: [UInt8], from receiver: Receiver) {
         if let event = HIDPPFeatureEvent(report: report) {
             handleFeatureEvent(event, from: receiver)
-            return
         }
         guard let notification = HIDPPConnectionNotification(report: report) else { return }
         slots.invalidate(DeviceKey(receiverID: receiver.id, deviceIndex: notification.deviceIndex))
