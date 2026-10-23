@@ -110,3 +110,23 @@ struct HIDPPConnectionNotificationTests {
         #expect(HIDPPConnectionNotification(report: report) == nil)
     }
 }
+
+@Suite("HID++ 2.0 feature events")
+struct HIDPPFeatureEventTests {
+    @Test(arguments: [0x02, HIDPP.directDeviceIndex] as [UInt8])
+    func parsesAnEventWithSoftwareIDZero(deviceIndex: UInt8) {
+        // 0x1000 battery broadcast from feature index 9: level 100, next 50, discharging.
+        let report: [UInt8] = [0x11, deviceIndex, 0x09, 0x00, 0x64, 0x32, 0x00] + Array(repeating: 0, count: 13)
+        #expect(HIDPPFeatureEvent(report: report) == HIDPPFeatureEvent(deviceIndex: deviceIndex, featureIndex: 9))
+    }
+
+    @Test(arguments: [
+        [0x11, 0x02, 0x09, 0x0B, 0x64, 0x32, 0x00], // our own software ID: a response, not an event
+        [0x11, 0x02, 0xFF, 0x00, 0x0B, 0x05, 0x00], // HID++ 2.0 error report for a root (index 0) request
+        [0x10, 0x02, 0x41, 0x04, 0x02, 0x6B, 0x40], // short HID++ 1.0 connection notification
+        [0x11, 0x02, 0x09], // truncated
+    ] as [[UInt8]])
+    func ignoresOtherReports(report: [UInt8]) {
+        #expect(HIDPPFeatureEvent(report: report) == nil)
+    }
+}

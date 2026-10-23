@@ -109,3 +109,22 @@ nonisolated struct HIDPPConnectionNotification: Sendable, Equatable {
         self.init(deviceIndex: report[1], isLinkEstablished: report[4] & Self.linkNotEstablishedFlag == 0)
     }
 }
+
+/// A HID++ 2.0 event the device sends on its own (software ID 0), e.g. a battery status broadcast.
+nonisolated struct HIDPPFeatureEvent: Sendable, Equatable {
+    let deviceIndex: UInt8
+    let featureIndex: UInt8
+
+    init(deviceIndex: UInt8, featureIndex: UInt8) {
+        self.deviceIndex = deviceIndex
+        self.featureIndex = featureIndex
+    }
+
+    /// Nil for responses to our requests, error reports and HID++ 1.0 notifications.
+    init?(report: [UInt8]) {
+        guard report.count >= 4, report[0] == HIDPP.longReportID, report[2] != HIDPP.hidpp20ErrorMarker,
+              report[3] & 0x0F == 0
+        else { return nil }
+        self.init(deviceIndex: report[1], featureIndex: report[2])
+    }
+}

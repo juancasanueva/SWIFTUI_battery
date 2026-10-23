@@ -84,9 +84,18 @@ struct BatteryStatusTests {
         #expect(reading == BatteryReading(percent: 45, isApproximate: false, chargingState: state))
     }
 
-    @Test func marksCoarseLevelsAsApproximate() {
-        let reading = BatteryStatus.parseStatus(payload(100, 50, 0), reportsPercentage: false)
-        #expect(reading == BatteryReading(percent: 100, isApproximate: true, chargingState: .discharging))
+    @Test(arguments: [
+        (UInt8(100), 95), (81, 95), (80, 60), (50, 60), (31, 60),
+        (30, 20), (11, 20), (10, 5), (0, 5), (200, 95),
+    ])
+    func bucketsCoarseLevelsLikeTheLinuxDriver(level: UInt8, percent: Int) {
+        let reading = BatteryStatus.parseStatus(payload(level, 0, 0), reportsPercentage: false)
+        #expect(reading == BatteryReading(percent: percent, isApproximate: true, chargingState: .discharging))
+    }
+
+    @Test func keepsTheLevelUnknownWhileChargingWithCoarseLevels() {
+        let reading = BatteryStatus.parseStatus(payload(0, 0, 1), reportsPercentage: false)
+        #expect(reading == BatteryReading(percent: nil, isApproximate: true, chargingState: .charging))
     }
 
     @Test func rejectsShortPayload() {
