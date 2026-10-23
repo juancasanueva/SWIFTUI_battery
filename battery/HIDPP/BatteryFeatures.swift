@@ -63,16 +63,29 @@ nonisolated enum UnifiedBattery {
 
 /// Feature 0x1000 BatteryStatus.
 nonisolated enum BatteryStatus {
+    private static let mileageFlag: UInt8 = 0x02
+    /// Below this many levels the reported value is a coarse step, not a percentage (same rule as the Linux driver).
+    private static let minimumPercentageLevels: UInt8 = 10
+
     static func statusRequest(deviceIndex: UInt8, featureIndex: UInt8) -> HIDPPRequest {
         HIDPPRequest(deviceIndex: deviceIndex, featureIndex: featureIndex, function: 0)
     }
 
-    static func parseStatus(_ payload: [UInt8]) -> BatteryReading? {
+    static func capabilityRequest(deviceIndex: UInt8, featureIndex: UInt8) -> HIDPPRequest {
+        HIDPPRequest(deviceIndex: deviceIndex, featureIndex: featureIndex, function: 1)
+    }
+
+    /// True when the device reports at least ten levels and sets the mileage flag.
+    static func reportsPercentage(capabilities payload: [UInt8]) -> Bool {
+        payload.count >= 2 && payload[0] >= minimumPercentageLevels && payload[1] & mileageFlag != 0
+    }
+
+    static func parseStatus(_ payload: [UInt8], reportsPercentage: Bool) -> BatteryReading? {
         guard payload.count >= 3 else { return nil }
         let state = chargingState(code: payload[2])
         // While recharging the level byte reads 0, meaning "unknown"; a 0 while discharging can be a real empty battery.
         let isLevelUnknown = payload[0] == 0 && (state == .charging || state == .slowCharging)
-        return BatteryReading(percent: isLevelUnknown ? nil : clampedPercent(payload[0]), isApproximate: false,
+        return BatteryReading(percent: isLevelUnknown ? nil : clampedPercent(payload[0]), isApproximate: !reportsPercentage,
                               chargingState: state)
     }
 

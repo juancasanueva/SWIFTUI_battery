@@ -111,7 +111,10 @@ struct DeviceProbe {
             return UnifiedBattery.parseStatus(status,
                                               supportsStateOfCharge: UnifiedBattery.supportsStateOfCharge(capabilities: capabilities))
         case .batteryStatus:
-            return BatteryStatus.parseStatus(try await send(BatteryStatus.statusRequest(deviceIndex: deviceIndex, featureIndex: index)))
+            let capabilities = try await send(BatteryStatus.capabilityRequest(deviceIndex: deviceIndex, featureIndex: index))
+            let status = try await send(BatteryStatus.statusRequest(deviceIndex: deviceIndex, featureIndex: index))
+            return BatteryStatus.parseStatus(status,
+                                             reportsPercentage: BatteryStatus.reportsPercentage(capabilities: capabilities))
         case .batteryVoltage:
             return BatteryVoltage.parseVoltage(try await send(BatteryVoltage.voltageRequest(deviceIndex: deviceIndex, featureIndex: index)))
         case .root, .deviceInformation, .deviceNameType:
