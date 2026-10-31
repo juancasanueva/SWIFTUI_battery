@@ -1,6 +1,18 @@
 import Testing
 @testable import battery
 
+private let padding = [UInt8](repeating: 0, count: 16)
+
+/// Typed apart from `@Test` because the literal takes the compiler too long to type-check inside the macro.
+private let unrelatedReports: [[UInt8]] = [
+    [0x10, 0x02, 0x05, 0x1B, 0, 0, 0],    // short report
+    [0x11, 0x03, 0x05, 0x1B] + padding,   // other device
+    [0x11, 0x02, 0x06, 0x1B] + padding,   // other feature
+    [0x11, 0x02, 0x05, 0x2B] + padding,   // other function
+    [0x11, 0x02, 0x05, 0x1C] + padding,   // other software ID
+    [0x11, 0x02, 0x05],                   // truncated
+]
+
 @Suite("HID++ report encoding and matching")
 struct HIDPPReportTests {
     let request = HIDPPRequest(deviceIndex: 0x02, featureIndex: 0x05, function: 0x01, parameters: [0xAA, 0xBB])
@@ -27,14 +39,7 @@ struct HIDPPReportTests {
         #expect(request.match(report) == .response(Array(1...16)))
     }
 
-    @Test(arguments: [
-        [UInt8]([0x10, 0x02, 0x05, 0x1B, 0, 0, 0]),                          // short report
-        [UInt8]([0x11, 0x03, 0x05, 0x1B] + Array(repeating: 0, count: 16)),  // other device
-        [UInt8]([0x11, 0x02, 0x06, 0x1B] + Array(repeating: 0, count: 16)),  // other feature
-        [UInt8]([0x11, 0x02, 0x05, 0x2B] + Array(repeating: 0, count: 16)),  // other function
-        [UInt8]([0x11, 0x02, 0x05, 0x1C] + Array(repeating: 0, count: 16)),  // other software ID
-        [UInt8]([0x11, 0x02, 0x05]),                                         // truncated
-    ])
+    @Test(arguments: unrelatedReports)
     func ignoresUnrelatedReports(report: [UInt8]) {
         #expect(request.match(report) == .noMatch)
     }
