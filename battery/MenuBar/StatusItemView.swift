@@ -14,16 +14,17 @@ enum StatusItemMetrics {
     static let separatorHeight: CGFloat = 14
     /// Card behind the segments (6 pt corner radius, 6 pt × 3 pt insets).
     static let cardCornerRadius: CGFloat = 6
+    /// Opaque, so the values stay legible over any wallpaper showing through the menu bar.
+    static let cardFill = Color.black
     static let horizontalPadding: CGFloat = 6
     static let verticalPadding: CGFloat = 3
 }
 
 /// Presentational status item content: `⌨ 80%  🖱 55%` on a rounded card.
 ///
-/// Hosted in the status bar button rather than rendered into a template image, so the card's
-/// `.quaternary` fill resolves through SwiftUI in the menu bar's own appearance instead of being
-/// tinted with the icon colour by AppKit. `Equatable` so SwiftUI skips the body while the
-/// segments stand still.
+/// Hosted in the status bar button rather than rendered into a template image, so the card keeps
+/// its own fill instead of being tinted with the icon colour by AppKit. `Equatable` so SwiftUI
+/// skips the body while the segments stand still.
 struct StatusItemContent: View, Equatable {
     let segments: [MenuBarLabel.Segment]
 
@@ -61,9 +62,11 @@ struct StatusItemContent: View, Equatable {
                 .padding(.horizontal, StatusItemMetrics.horizontalPadding)
                 .padding(.vertical, StatusItemMetrics.verticalPadding)
                 .background(
-                    .quaternary,
+                    StatusItemMetrics.cardFill,
                     in: RoundedRectangle(cornerRadius: StatusItemMetrics.cardCornerRadius, style: .continuous)
                 )
+                // The card is always dark, so its contents resolve as dark whatever the menu bar's appearance.
+                .environment(\.colorScheme, .dark)
             }
         }
         .font(.system(size: StatusItemMetrics.fontSize))
